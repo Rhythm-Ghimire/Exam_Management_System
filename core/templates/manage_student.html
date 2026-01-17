@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Manage Students</h2>
+        <a href="{% url 'add_student' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add Student
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            <div class="mb-3">
+                <input type="text" id="searchInput" class="form-control" placeholder="Search students...">
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover" id="studentsTable">
+                    <thead>
+                        <tr>
+                            <th>Roll Number</th>
+                            <th>Name</th>
+                            <th>Branch</th>
+                            <th>Semester</th>
+                            <th>Fees Paid</th>
+                            <th>Attendance</th>
+                            <th>Eligible</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in students %}
+                        <tr>
+                            <td>{{ student.roll_number }}</td>
+                            <td>{{ student.user.get_full_name }}</td>
+                            <td>{{ student.branch }}</td>
+                            <td>{{ student.semester }}</td>
+                            <td>
+                                {% if student.fees_paid %}
+                                    <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                    <span class="badge bg-danger">No</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ student.attendance }}%</td>
+                            <td>
+                                {% if student.is_eligible %}
+                                    <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                    <span class="badge bg-danger">No</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'edit_student' student.id %}" class="btn btn-sm btn-warning">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'delete_student' student.id %}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    searchTable('searchInput', 'studentsTable');
+</script>
+{% endblock %}

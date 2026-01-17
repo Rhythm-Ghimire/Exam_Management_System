@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4"><i class="fas fa-chart-line"></i> Performance Analytics</h2>
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-table"></i> Subject-wise Performance
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Subject</th>
+                                    <th>Total Students</th>
+                                    <th>Passed</th>
+                                    <th>Failed</th>
+                                    <th>Pass %</th>
+                                    <th>Average Marks</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for data in analytics_data %}
+                                <tr>
+                                    <td><strong>{{ data.subject }}</strong></td>
+                                    <td>{{ data.total }}</td>
+                                    <td><span class="badge bg-success">{{ data.passed }}</span></td>
+                                    <td><span class="badge bg-danger">{{ data.failed }}</span></td>
+                                    <td>
+                                        <div class="progress" style="height: 25px;">
+                                            <div class="progress-bar {% if data.pass_percentage >= 75 %}bg-success{% elif data.pass_percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                                 role="progressbar" 
+                                                 style="width: {{ data.pass_percentage }}%;" 
+                                                 aria-valuenow="{{ data.pass_percentage }}" 
+                                                 aria-valuemin="0" 
+                                                 aria-valuemax="100">
+                                                {{ data.pass_percentage }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ data.avg_marks }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center">No data available</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="chart-container">
+                <h5 class="mb-3">Pass/Fail Distribution</h5>
+                <canvas id="passFailChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-4">
+            <div class="chart-container">
+                <h5 class="mb-3">Average Marks by Subject</h5>
+                <canvas id="avgMarksChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const analyticsData = {{ analytics_data|safe }};
+    
+    if (analyticsData && analyticsData.length > 0) {
+        // Pass/Fail Chart
+        const subjects = analyticsData.map(d => d.subject);
+        const passed = analyticsData.map(d => d.passed);
+        const failed = analyticsData.map(d => d.failed);
+        
+        new Chart(document.getElementById('passFailChart'), {
+            type: 'bar',
+            data: {
+                labels: subjects,
+                datasets: [
+                    {
+                        label: 'Passed',
+                        data: passed,
+                        backgroundColor: 'rgba(16, 185, 129, 0.6)',
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Failed',
+                        data: failed,
+                        backgroundColor: 'rgba(239, 68, 68, 0.6)',
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        borderWidth: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        
+        // Average Marks Chart
+        const avgMarks = analyticsData.map(d => d.avg_marks);
+        
+        new Chart(document.getElementById('avgMarksChart'), {
+            type: 'line',
+            data: {
+                labels: subjects,
+                datasets: [{
+                    label: 'Average Marks',
+                    data: avgMarks,
+                    backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                    borderColor: 'rgba(37, 99, 235, 1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

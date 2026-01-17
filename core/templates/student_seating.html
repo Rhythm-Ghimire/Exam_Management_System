@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chair"></i> Your Seating Arrangement
+                </div>
+                <div class="card-body">
+                    <h4 class="text-primary mb-4">{{ exam.subject.name }}</h4>
+                    
+                    {% if seating %}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p><strong>Date:</strong> {{ exam.date|date:"M d, Y" }}</p>
+                            <p><strong>Time:</strong> {{ exam.start_time|time:"g:i A" }} - {{ exam.end_time|time:"g:i A" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Exam Hall:</strong> {{ seating.hall.name }}</p>
+                            <p><strong>Seat Number:</strong> <span class="badge bg-primary" style="font-size: 1.2rem;">{{ seating.seat_number }}</span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> Please arrive 15 minutes before the exam starts. Bring your student ID card.
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> <strong>Instructions:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Mobile phones and electronic devices are not allowed</li>
+                            <li>Arrive at least 15 minutes before exam time</li>
+                            <li>Bring valid student ID card</li>
+                            <li>No calculator unless specified by the subject</li>
+                        </ul>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> Seating arrangement not yet generated for this exam.
+                    </div>
+                    {% endif %}
+                    
+                    <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

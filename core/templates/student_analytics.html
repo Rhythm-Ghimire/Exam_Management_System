@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4"><i class="fas fa-chart-pie"></i> My Performance Analytics</h2>
+    
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="stat-card">
+                <div class="icon primary">
+                    <i class="fas fa-book"></i>
+                </div>
+                <h3>{{ total_subjects }}</h3>
+                <p>Total Subjects</p>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="stat-card">
+                <div class="icon success">
+                    <i class="fas fa-percentage"></i>
+                </div>
+                <h3>{{ overall_percentage }}%</h3>
+                <p>Overall Percentage</p>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="stat-card">
+                <div class="icon warning">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <h3>
+                    {% if overall_percentage >= 90 %}A+
+                    {% elif overall_percentage >= 80 %}A
+                    {% elif overall_percentage >= 70 %}B+
+                    {% elif overall_percentage >= 60 %}B
+                    {% elif overall_percentage >= 50 %}C+
+                    {% elif overall_percentage >= 40 %}C
+                    {% else %}F
+                    {% endif %}
+                </h3>
+                <p>Overall Grade</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-list"></i> Subject-wise Performance
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Subject</th>
+                                    <th>Marks</th>
+                                    <th>Percentage</th>
+                                    <th>Grade</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for perf in subject_performance %}
+                                <tr>
+                                    <td><strong>{{ perf.subject }}</strong></td>
+                                    <td>{{ perf.marks }} / {{ perf.max_marks }}</td>
+                                    <td>
+                                        <div class="progress" style="height: 25px;">
+                                            <div class="progress-bar {% if perf.percentage >= 75 %}bg-success{% elif perf.percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                                 role="progressbar" 
+                                                 style="width: {{ perf.percentage }}%;">
+                                                {{ perf.percentage }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge bg-primary">{{ perf.grade }}</span></td>
+                                    <td>
+                                        {% if perf.status == 'Pass' %}
+                                            <span class="badge bg-success">{{ perf.status }}</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">{{ perf.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">No results available yet</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="chart-container">
+                <h5 class="mb-3">Performance by Subject</h5>
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-4">
+            <div class="chart-container">
+                <h5 class="mb-3">Grade Distribution</h5>
+                <canvas id="gradeChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-check-circle"></i> Strengths
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% for perf in subject_performance %}
+                            {% if perf.percentage >= 70 %}
+                            <li class="list-group-item">
+                                <strong>{{ perf.subject }}</strong>
+                                <span class="float-end badge bg-success">{{ perf.percentage }}%</span>
+                            </li>
+                            {% endif %}
+                        {% empty %}
+                            <li class="list-group-item">Keep working hard!</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-warning text-white">
+                    <i class="fas fa-exclamation-triangle"></i> Areas to Improve
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% for perf in subject_performance %}
+                            {% if perf.percentage < 70 %}
+                            <li class="list-group-item">
+                                <strong>{{ perf.subject }}</strong>
+                                <span class="float-end badge bg-warning">{{ perf.percentage }}%</span>
+                            </li>
+                            {% endif %}
+                        {% empty %}
+                            <li class="list-group-item">Great job! Keep it up!</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const subjectPerformance = {{ subject_performance|safe }};
+    
+    if (subjectPerformance && subjectPerformance.length > 0) {
+        const subjects = subjectPerformance.map(p => p.subject);
+        const percentages = subjectPerformance.map(p => p.percentage);
+        const grades = subjectPerformance.map(p => p.grade);
+        
+        // Performance Chart
+        new Chart(document.getElementById('performanceChart'), {
+            type: 'bar',
+            data: {
+                labels: subjects,
+                datasets: [{
+                    label: 'Percentage',
+                    data: percentages,
+                    backgroundColor: 'rgba(37, 99, 235, 0.6)',
+                    borderColor: 'rgba(37, 99, 235, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+        
+        // Grade Distribution
+        const gradeCount = {};
+        grades.forEach(g => {
+            gradeCount[g] = (gradeCount[g] || 0) + 1;
+        });
+        
+        new Chart(document.getElementById('gradeChart'), {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(gradeCount),
+                datasets: [{
+                    data: Object.values(gradeCount),
+                    backgroundColor: [
+                        'rgba(16, 185, 129, 0.6)',
+                        'rgba(37, 99, 235, 0.6)',
+                        'rgba(245, 158, 11, 0.6)',
+                        'rgba(239, 68, 68, 0.6)',
+                        'rgba(139, 92, 246, 0.6)',
+                        'rgba(236, 72, 153, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(16, 185, 129, 1)',
+                        'rgba(37, 99, 235, 1)',
+                        'rgba(245, 158, 11, 1)',
+                        'rgba(239, 68, 68, 1)',
+                        'rgba(139, 92, 246, 1)',
+                        'rgba(236, 72, 153, 1)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-clipboard-list"></i> Manage Exams</h2>
+        <a href="{% url 'add_exam' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add Exam
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            <div class="mb-3">
+                <input type="text" id="searchInput" class="form-control" placeholder="Search exams...">
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover" id="examsTable">
+                    <thead>
+                        <tr>
+                            <th>Subject</th>
+                            <th>Code</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Semester</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for exam in exams %}
+                        <tr>
+                            <td>{{ exam.subject.name }}</td>
+                            <td><span class="badge bg-info">{{ exam.subject.code }}</span></td>
+                            <td>{{ exam.date|date:"M d, Y" }}</td>
+                            <td>{{ exam.start_time|time:"g:i A" }} - {{ exam.end_time|time:"g:i A" }}</td>
+                            <td>{{ exam.semester }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'view_seating' exam.id %}" class="btn btn-sm btn-info" title="View Seating">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'generate_seating' exam.id %}" class="btn btn-sm btn-success" 
+                                       onclick="return confirm('Generate seating arrangement for {{ exam.subject.name }}?')" 
+                                       title="Generate Seating">
+                                        <i class="fas fa-cogs"></i>
+                                    </a>
+                                    <a href="{% url 'download_seating_pdf' exam.id %}" class="btn btn-sm btn-warning" title="Download PDF">
+                                        <i class="fas fa-file-pdf"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center">No exams found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    searchTable('searchInput', 'examsTable');
+</script>
+{% endblock %}
