@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Student, Subject, ExamHall, Invigilator, Exam, SeatingArrangement, InvigilatorAssignment, Result
+from .models import Student, Subject, ExamHall, Invigilator, ExamSchedule, Exam, SeatingArrangement, InvigilatorAssignment, Result
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
@@ -9,8 +9,8 @@ class StudentAdmin(admin.ModelAdmin):
 
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
-    list_display = ['code', 'name', 'semester']
-    list_filter = ['semester']
+    list_display = ['code', 'name', 'branch', 'semester']
+    list_filter = ['branch', 'semester']
     search_fields = ['code', 'name']
 
 @admin.register(ExamHall)
@@ -23,10 +23,15 @@ class InvigilatorAdmin(admin.ModelAdmin):
     list_display = ['name', 'email', 'phone']
     search_fields = ['name', 'email']
 
+@admin.register(ExamSchedule)
+class ExamScheduleAdmin(admin.ModelAdmin):
+    list_display = ['name', 'branch', 'semester', 'exam_type', 'start_date', 'end_date']
+    list_filter = ['branch', 'semester', 'exam_type']
+
 @admin.register(Exam)
 class ExamAdmin(admin.ModelAdmin):
-    list_display = ['subject', 'date', 'start_time', 'end_time', 'semester']
-    list_filter = ['date', 'semester']
+    list_display = ['subject', 'schedule', 'date', 'start_time', 'end_time']
+    list_filter = ['date', 'schedule']
     search_fields = ['subject__name', 'subject__code']
 
 @admin.register(SeatingArrangement)

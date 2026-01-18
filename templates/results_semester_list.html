@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'results_home' %}">Results</a></li>
+            <li class="breadcrumb-item active">{{ branch }}</li>
+        </ol>
+    </nav>
+    
+    <div class="card">
+        <div class="card-header {% if branch == 'BScCSIT' %}bg-primary{% else %}bg-success{% endif %} text-white">
+            <h5 class="mb-0"><i class="fas fa-chart-bar"></i> {{ branch }} - Step 2: Select Semester</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                {% for sem in semesters %}
+                <div class="col-md-3">
+                    <a href="{% url 'results_student_list' branch sem %}" class="text-decoration-none">
+                        <div class="card h-100 {% if branch == 'BScCSIT' %}border-primary{% else %}border-success{% endif %}" style="border-width: 2px;">
+                            <div class="card-body text-center">
+                                <h3 class="{% if branch == 'BScCSIT' %}text-primary{% else %}text-success{% endif %}">
+                                    <i class="fas fa-book-open"></i> Semester {{ sem }}
+                                </h3>
+                                <p class="mb-0">
+                                    <span class="badge bg-secondary">{{ student_counts|get_item:sem }} Students</span>
+                                </p>
+                                <button class="btn {% if branch == 'BScCSIT' %}btn-outline-primary{% else %}btn-outline-success{% endif %} btn-sm mt-2">
+                                    View Students
+                                </button>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

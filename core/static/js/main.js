@@ -3,9 +3,9 @@ function confirmDelete(message) {
     return confirm(message || 'Are you sure you want to delete this item?');
 }
 
-// Auto-hide alerts after 5 seconds
+// Auto-hide only dismissible alerts (success/error messages), not static info alerts
 document.addEventListener('DOMContentLoaded', function() {
-    const alerts = document.querySelectorAll('.alert');
+    const alerts = document.querySelectorAll('.alert-dismissible');
     alerts.forEach(alert => {
         setTimeout(() => {
             const bsAlert = new bootstrap.Alert(alert);

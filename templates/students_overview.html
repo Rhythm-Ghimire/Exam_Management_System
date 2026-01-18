@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-users"></i> Students Overview</h2>
+        <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+    
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h3 class="text-primary">{{ total_students }}</h3>
+                    <p class="mb-0">Total Students</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h3 class="text-success">{{ paid_fees }}</h3>
+                    <p class="mb-0">Fees Paid</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h3 class="text-danger">{{ unpaid_fees }}</h3>
+                    <p class="mb-0">Fees Unpaid</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% for branch, semesters in grouped_students.items %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4 class="mb-0"><i class="fas fa-graduation-cap"></i> {{ branch }}</h4>
+        </div>
+        <div class="card-body">
+            {% for semester, students in semesters.items %}
+            <div class="mb-4">
+                <h5 class="text-primary mb-3">
+                    <i class="fas fa-book-open"></i> Semester {{ semester }}
+                    <span class="badge bg-secondary">{{ students|length }} Students</span>
+                </h5>
+                
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Roll No.</th>
+                                <th>Name</th>
+                                <th>Attendance</th>
+                                <th>Fees</th>
+                                <th>Eligible</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in students %}
+                            <tr>
+                                <td><strong>{{ student.roll_number }}</strong></td>
+                                <td>{{ student.user.get_full_name }}</td>
+                                <td>
+                                    <span class="badge {% if student.attendance >= 75 %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ student.attendance }}%
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if student.fees_paid %}
+                                        <span class="badge bg-success">Paid</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Unpaid</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if student.is_eligible %}
+                                        <span class="badge bg-success">Yes</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">No</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'edit_student' student.id %}" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <hr>
+            {% endfor %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> No students found. Add students to get started.
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

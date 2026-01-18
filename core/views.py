@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.contrib import messages
 from django.db.models import Avg, Count, Q
 from django.http import JsonResponse, HttpResponse
-from .models import Student, Subject, ExamHall, Invigilator, Exam, SeatingArrangement, InvigilatorAssignment, Result
+from .models import Student, Subject, ExamHall, Invigilator, ExamSchedule, Exam, SeatingArrangement, InvigilatorAssignment, Result
 from .forms import StudentRegistrationForm, StudentForm, SubjectForm, ExamHallForm, InvigilatorForm, ExamForm, ResultForm
 from .algorithms.seating import generate_seating_arrangement
 from .algorithms.invigilator import assign_invigilators
@@ -35,13 +35,36 @@ def user_login(request):
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
+        user_type = request.POST.get('user_type')
         
+        if not user_type:
+            messages.error(request, 'Please select whether you are Admin or Student')
+            return render(request, 'login.html')
+        
+        # Try to authenticate
         user = authenticate(request, username=username, password=password)
         
         if user is not None:
-            login(request, user)
-            messages.success(request, f'Welcome {user.get_full_name() or user.username}!')
-            return redirect('dashboard')
+            # Check if user type matches
+            if user_type == 'admin':
+                if user.is_staff or user.is_superuser:
+                    login(request, user)
+                    messages.success(request, f'Welcome Admin {user.get_full_name() or user.username}!')
+                    return redirect('dashboard')
+                else:
+                    messages.error(request, 'You are not authorized to login as Admin')
+            elif user_type == 'student':
+                if not user.is_staff:
+                    # Check if student profile exists
+                    try:
+                        student = Student.objects.get(user=user)
+                        login(request, user)
+                        messages.success(request, f'Welcome {user.get_full_name() or user.username}!')
+                        return redirect('dashboard')
+                    except Student.DoesNotExist:
+                        messages.error(request, 'Student profile not found. Please contact admin.')
+                else:
+                    messages.error(request, 'Admin accounts cannot login as Student')
         else:
             messages.error(request, 'Invalid username or password. Please check your credentials.')
     
@@ -79,25 +102,73 @@ def dashboard(request):
             'total_exams': Exam.objects.count(),
             'total_halls': ExamHall.objects.count(),
             'eligible_students': Student.objects.filter(fees_paid=True, attendance__gte=75).count(),
-            'upcoming_exams': Exam.objects.order_by('date')[:5]
+            'paid_fees_students': Student.objects.filter(fees_paid=True).count(),
+            'unpaid_fees_students': Student.objects.filter(fees_paid=False).count(),
+            'upcoming_exams': Exam.objects.select_related('schedule', 'subject').order_by('date')[:5]
         }
         return render(request, 'admin_dashboard.html', context)
     else:
         try:
             student = Student.objects.get(user=request.user)
-            seating = SeatingArrangement.objects.filter(student=student).select_related('exam', 'hall')
+            seating = SeatingArrangement.objects.filter(student=student).select_related('exam', 'hall', 'exam__schedule')
             results = Result.objects.filter(student=student).select_related('subject', 'exam')
+            
+            # Get upcoming exams for student's semester and branch
+            upcoming_exams = Exam.objects.filter(
+                schedule__semester=student.semester,
+                schedule__branch=student.branch
+            ).select_related('schedule', 'subject').order_by('date')[:5]
             
             context = {
                 'student': student,
                 'seating_arrangements': seating,
                 'results': results,
-                'upcoming_exams': Exam.objects.filter(semester=student.semester).order_by('date')[:5]
+                'upcoming_exams': upcoming_exams
             }
             return render(request, 'student_dashboard.html', context)
         except Student.DoesNotExist:
             messages.error(request, 'Student profile not found. Please contact admin.')
             return redirect('index')
+
+
+@login_required
+@user_passes_test(is_admin)
+def students_overview(request):
+    """Show all students grouped by branch and semester"""
+    students = Student.objects.all().select_related('user').order_by('branch', 'semester', 'roll_number')
+    
+    # Group students by branch and semester
+    grouped_students = {}
+    for student in students:
+        branch = student.branch
+        semester = student.semester
+        
+        if branch not in grouped_students:
+            grouped_students[branch] = {}
+        
+        if semester not in grouped_students[branch]:
+            grouped_students[branch][semester] = []
+        
+        grouped_students[branch][semester].append(student)
+    
+    # Get subjects and exams for each semester
+    subjects_by_semester = {}
+    exams_by_semester = {}
+    
+    for semester in range(1, 9):
+        subjects_by_semester[semester] = Subject.objects.filter(semester=semester)
+        exams_by_semester[semester] = Exam.objects.filter(semester=semester)
+    
+    context = {
+        'grouped_students': grouped_students,
+        'subjects_by_semester': subjects_by_semester,
+        'exams_by_semester': exams_by_semester,
+        'total_students': students.count(),
+        'paid_fees': students.filter(fees_paid=True).count(),
+        'unpaid_fees': students.filter(fees_paid=False).count(),
+    }
+    
+    return render(request, 'students_overview.html', context)
 
 
 @login_required
@@ -130,6 +201,8 @@ def add_student(request):
                 first_name=first_name,
                 last_name=last_name
             )
+            user.is_staff = False  # Important: Students are NOT staff
+            user.save()
             
             Student.objects.create(
                 user=user,
@@ -140,7 +213,7 @@ def add_student(request):
                 attendance=float(attendance)
             )
             
-            messages.success(request, 'Student added successfully!')
+            messages.success(request, f'Student {username} added successfully! Password: {password}')
             return redirect('manage_students')
         except Exception as e:
             messages.error(request, f'Error: {str(e)}')
@@ -187,8 +260,19 @@ def delete_student(request, student_id):
 @login_required
 @user_passes_test(is_admin)
 def manage_subjects(request):
-    subjects = Subject.objects.all()
-    return render(request, 'manage_subjects.html', {'subjects': subjects})
+    # Get subjects grouped by branch and semester
+    bsccsit_subjects = {}
+    bca_subjects = {}
+    
+    for sem in range(1, 9):
+        bsccsit_subjects[sem] = Subject.objects.filter(branch='BScCSIT', semester=sem).order_by('code')
+        bca_subjects[sem] = Subject.objects.filter(branch='BCA', semester=sem).order_by('code')
+    
+    context = {
+        'bsccsit_subjects': bsccsit_subjects,
+        'bca_subjects': bca_subjects,
+    }
+    return render(request, 'manage_subjects.html', context)
 
 
 @login_required
@@ -198,7 +282,8 @@ def add_subject(request):
         Subject.objects.create(
             code=request.POST.get('code'),
             name=request.POST.get('name'),
-            semester=int(request.POST.get('semester'))
+            semester=int(request.POST.get('semester')),
+            branch=request.POST.get('branch')
         )
         messages.success(request, 'Subject added successfully!')
         return redirect('manage_subjects')
@@ -253,8 +338,111 @@ def add_invigilator(request):
 @login_required
 @user_passes_test(is_admin)
 def manage_exams(request):
-    exams = Exam.objects.all().select_related('subject')
-    return render(request, 'manage_exams.html', {'exams': exams})
+    schedules = ExamSchedule.objects.all().prefetch_related('exams__subject').order_by('-created_at')
+    
+    # Debug: print to console
+    print(f"Found {schedules.count()} schedules")
+    for schedule in schedules:
+        print(f"Schedule: {schedule.name}, Exams: {schedule.exams.count()}")
+    
+    return render(request, 'manage_exams.html', {'schedules': schedules})
+
+
+@login_required
+@user_passes_test(is_admin)
+def create_exam_schedule(request):
+    """Step 1: Create exam schedule (branch, semester, exam type)"""
+    if request.method == 'POST':
+        branch = request.POST.get('branch')
+        semester = int(request.POST.get('semester'))
+        exam_type = request.POST.get('exam_type')
+        start_date = request.POST.get('start_date')
+        end_date = request.POST.get('end_date')
+        
+        # Create schedule name
+        exam_type_display = 'Mid Term' if exam_type == 'mid_term' else 'Final Term'
+        schedule_name = f"{branch} Semester {semester} {exam_type_display} {start_date[:4]}"
+        
+        # Check if schedule already exists
+        existing = ExamSchedule.objects.filter(
+            branch=branch,
+            semester=semester,
+            exam_type=exam_type,
+            start_date=start_date
+        ).first()
+        
+        if existing:
+            messages.info(request, f'Schedule already exists: {existing.name}')
+            return redirect('add_exam_to_schedule', schedule_id=existing.id)
+        
+        # Create new schedule
+        schedule = ExamSchedule.objects.create(
+            name=schedule_name,
+            branch=branch,
+            semester=semester,
+            exam_type=exam_type,
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        messages.success(request, f'Schedule created: {schedule_name}. Now add exams to this schedule.')
+        return redirect('add_exam_to_schedule', schedule_id=schedule.id)
+    
+    return render(request, 'create_exam_schedule.html')
+
+
+@login_required
+@user_passes_test(is_admin)
+def add_exam_to_schedule(request, schedule_id):
+    """Step 2: Add exams to the schedule"""
+    schedule = get_object_or_404(ExamSchedule, id=schedule_id)
+    
+    if request.method == 'POST':
+        subject_id = request.POST.get('subject')
+        date = request.POST.get('date')
+        start_time = request.POST.get('start_time')
+        end_time = request.POST.get('end_time')
+        
+        subject = Subject.objects.get(id=subject_id)
+        
+        # Check if exam already exists for this subject in this schedule
+        existing = Exam.objects.filter(schedule=schedule, subject=subject).first()
+        if existing:
+            messages.warning(request, f'Exam for {subject.name} already exists in this schedule.')
+        else:
+            Exam.objects.create(
+                schedule=schedule,
+                subject=subject,
+                date=date,
+                start_time=start_time,
+                end_time=end_time
+            )
+            messages.success(request, f'Added exam for {subject.name}')
+        
+        # Check if user wants to add more
+        if request.POST.get('add_another'):
+            return redirect('add_exam_to_schedule', schedule_id=schedule.id)
+        else:
+            return redirect('manage_exams')
+    
+    # Get subjects for this branch and semester
+    subjects = Subject.objects.filter(
+        branch=schedule.branch,
+        semester=schedule.semester
+    ).order_by('code')
+    
+    # Get already added exams
+    added_exams = schedule.exams.all().select_related('subject')
+    added_subject_ids = [exam.subject.id for exam in added_exams]
+    
+    context = {
+        'schedule': schedule,
+        'subjects': subjects,
+        'added_exams': added_exams,
+        'added_subject_ids': added_subject_ids,
+    }
+    
+    return render(request, 'add_exam_to_schedule.html', context)
 
 
 @login_required
@@ -262,14 +450,33 @@ def manage_exams(request):
 def add_exam(request):
     if request.method == 'POST':
         subject = Subject.objects.get(id=request.POST.get('subject'))
+        branch = request.POST.get('branch')
+        semester = int(request.POST.get('semester'))
+        exam_type = request.POST.get('exam_type')
+        
+        # Create or get exam schedule
+        schedule_name = f"{branch} Semester {semester} {exam_type.replace('_', ' ').title()} {request.POST.get('date')[:4]}"
+        schedule, created = ExamSchedule.objects.get_or_create(
+            branch=branch,
+            semester=semester,
+            exam_type=exam_type,
+            defaults={
+                'name': schedule_name,
+                'start_date': request.POST.get('date'),
+                'end_date': request.POST.get('date')
+            }
+        )
+        
+        # Create exam
         Exam.objects.create(
+            schedule=schedule,
             subject=subject,
             date=request.POST.get('date'),
             start_time=request.POST.get('start_time'),
-            end_time=request.POST.get('end_time'),
-            semester=int(request.POST.get('semester'))
+            end_time=request.POST.get('end_time')
         )
-        messages.success(request, 'Exam added successfully!')
+        
+        messages.success(request, f'Exam added successfully to {schedule_name}!')
         return redirect('manage_exams')
     
     subjects = Subject.objects.all()
@@ -285,9 +492,12 @@ def generate_seating(request, exam_id):
     SeatingArrangement.objects.filter(exam=exam).delete()
     InvigilatorAssignment.objects.filter(exam=exam).delete()
     
+    # Get semester from schedule
+    semester = exam.schedule.semester if exam.schedule else exam.subject.semester
+    
     # Get eligible students
     students = Student.objects.filter(
-        semester=exam.semester,
+        semester=semester,
         fees_paid=True,
         attendance__gte=75.0
     ).order_by('roll_number')
@@ -318,6 +528,59 @@ def generate_seating(request, exam_id):
     
     messages.success(request, 'Seating arrangement and invigilator assignment generated successfully!')
     return redirect('view_seating', exam_id=exam.id)
+
+
+@login_required
+@user_passes_test(is_admin)
+def generate_schedule_seating(request, schedule_id):
+    """Generate seating for all exams in a schedule"""
+    schedule = get_object_or_404(ExamSchedule, id=schedule_id)
+    exams = schedule.exams.all()
+    
+    if not exams.exists():
+        messages.error(request, 'No exams found in this schedule.')
+        return redirect('manage_exams')
+    
+    # Get eligible students for this semester
+    students = Student.objects.filter(
+        semester=schedule.semester,
+        branch=schedule.branch,
+        fees_paid=True,
+        attendance__gte=75.0
+    ).order_by('roll_number')
+    
+    if not students.exists():
+        messages.error(request, f'No eligible students found for {schedule.branch} Semester {schedule.semester}.')
+        return redirect('manage_exams')
+    
+    # Get available halls
+    halls = ExamHall.objects.filter(is_available=True).order_by('-capacity')
+    
+    if not halls.exists():
+        messages.error(request, 'No available exam halls found.')
+        return redirect('manage_exams')
+    
+    # Get invigilators
+    invigilators = Invigilator.objects.all()
+    
+    success_count = 0
+    for exam in exams:
+        # Clear existing arrangements
+        SeatingArrangement.objects.filter(exam=exam).delete()
+        InvigilatorAssignment.objects.filter(exam=exam).delete()
+        
+        # Generate seating
+        if generate_seating_arrangement(exam, students, halls):
+            if invigilators.exists():
+                assign_invigilators(exam, halls, invigilators)
+            success_count += 1
+    
+    if success_count == exams.count():
+        messages.success(request, f'Successfully generated seating arrangements for all {success_count} exams in {schedule.name}!')
+    else:
+        messages.warning(request, f'Generated seating for {success_count} out of {exams.count()} exams.')
+    
+    return redirect('manage_exams')
 
 
 @login_required
@@ -429,6 +692,150 @@ def download_seating_pdf(request, exam_id):
 
 @login_required
 @user_passes_test(is_admin)
+def results_home(request):
+    """Step 1: Select Branch"""
+    branches = [
+        {'code': 'BScCSIT', 'name': 'BScCSIT - Bachelor of Science in Computer Science and Information Technology'},
+        {'code': 'BCA', 'name': 'BCA - Bachelor of Computer Applications'}
+    ]
+    return render(request, 'results_home.html', {'branches': branches})
+
+
+@login_required
+@user_passes_test(is_admin)
+def results_semester_list(request, branch):
+    """Step 2: Select Semester"""
+    semesters = range(1, 9)
+    student_counts = {}
+    
+    for sem in semesters:
+        student_counts[sem] = Student.objects.filter(branch=branch, semester=sem).count()
+    
+    context = {
+        'branch': branch,
+        'semesters': semesters,
+        'student_counts': student_counts
+    }
+    return render(request, 'results_semester_list.html', context)
+
+
+@login_required
+@user_passes_test(is_admin)
+def results_student_list(request, branch, semester):
+    """Step 3: Select Student"""
+    students = Student.objects.filter(
+        branch=branch,
+        semester=semester
+    ).select_related('user').order_by('roll_number')
+    
+    # Get result completion status for each student
+    subjects = Subject.objects.filter(branch=branch, semester=semester)
+    subject_count = subjects.count()
+    
+    student_data = []
+    for student in students:
+        result_count = Result.objects.filter(
+            student=student,
+            subject__in=subjects
+        ).count()
+        
+        student_data.append({
+            'student': student,
+            'results_entered': result_count,
+            'total_subjects': subject_count,
+            'is_complete': result_count == subject_count and subject_count > 0
+        })
+    
+    context = {
+        'branch': branch,
+        'semester': semester,
+        'student_data': student_data,
+        'subjects': subjects
+    }
+    return render(request, 'results_student_list.html', context)
+
+
+@login_required
+@user_passes_test(is_admin)
+def student_marksheet(request, branch, semester, student_id):
+    """Step 4: View/Edit Student Marksheet"""
+    student = get_object_or_404(Student, id=student_id, branch=branch, semester=semester)
+    subjects = Subject.objects.filter(branch=branch, semester=semester).order_by('code')
+    
+    # Get existing results
+    results = {}
+    for subject in subjects:
+        result = Result.objects.filter(student=student, subject=subject).first()
+        results[subject.id] = result
+    
+    context = {
+        'student': student,
+        'subjects': subjects,
+        'results': results,
+        'branch': branch,
+        'semester': semester
+    }
+    return render(request, 'student_marksheet.html', context)
+
+
+@login_required
+@user_passes_test(is_admin)
+def add_student_results(request, branch, semester, student_id):
+    """Add/Update results for all subjects of a student"""
+    student = get_object_or_404(Student, id=student_id, branch=branch, semester=semester)
+    subjects = Subject.objects.filter(branch=branch, semester=semester).order_by('code')
+    
+    if request.method == 'POST':
+        updated_count = 0
+        created_count = 0
+        
+        for subject in subjects:
+            marks_key = f'marks_{subject.id}'
+            marks = request.POST.get(marks_key)
+            
+            if marks and marks.strip():
+                marks_value = float(marks)
+                
+                # Get or create result
+                result, created = Result.objects.get_or_create(
+                    student=student,
+                    subject=subject,
+                    defaults={
+                        'marks_obtained': marks_value,
+                        'max_marks': 100,
+                        'exam': None  # Can be linked to exam if needed
+                    }
+                )
+                
+                if not created:
+                    result.marks_obtained = marks_value
+                    result.save()
+                    updated_count += 1
+                else:
+                    created_count += 1
+        
+        messages.success(request, f'Results saved! Created: {created_count}, Updated: {updated_count}')
+        return redirect('student_marksheet', branch=branch, semester=semester, student_id=student_id)
+    
+    # Get existing results
+    existing_results = {}
+    for subject in subjects:
+        result = Result.objects.filter(student=student, subject=subject).first()
+        if result:
+            existing_results[subject.id] = result.marks_obtained
+    
+    context = {
+        'student': student,
+        'subjects': subjects,
+        'existing_results': existing_results,
+        'branch': branch,
+        'semester': semester
+    }
+    return render(request, 'add_student_results.html', context)
+
+
+@login_required
+@user_passes_test(is_admin)
 def manage_results(request):
     results = Result.objects.all().select_related('student', 'subject', 'exam')
     return render(request, 'manage_results.html', {'results': results})
@@ -532,13 +939,29 @@ def performance_analytics(request):
 @login_required
 def timetable(request):
     if request.user.is_staff:
-        exams = Exam.objects.all().select_related('subject').order_by('date', 'start_time')
+        schedules = ExamSchedule.objects.all().prefetch_related('exams__subject')
     else:
         try:
             student = Student.objects.get(user=request.user)
-            exams = Exam.objects.filter(semester=student.semester).select_related('subject').order_by('date', 'start_time')
+            schedules = ExamSchedule.objects.filter(
+                semester=student.semester,
+                branch=student.branch
+            ).prefetch_related('exams__subject')
         except Student.DoesNotExist:
             messages.error(request, 'Student profile not found.')
             return redirect('dashboard')
     
-    return render(request, 'timetable.html', {'exams': exams})
+    return render(request, 'timetable.html', {'schedules': schedules})
+
+
+@login_required
+def get_subjects_api(request):
+    """API endpoint to get subjects by branch and semester"""
+    branch = request.GET.get('branch')
+    semester = request.GET.get('semester')
+    
+    if branch and semester:
+        subjects = Subject.objects.filter(branch=branch, semester=int(semester)).values('id', 'code', 'name')
+        return JsonResponse({'subjects': list(subjects)})
+    
+    return JsonResponse({'subjects': []})

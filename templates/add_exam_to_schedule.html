@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header {% if schedule.branch == 'BScCSIT' %}bg-primary{% else %}bg-success{% endif %} text-white">
+                    <h6 class="mb-0"><i class="fas fa-info-circle"></i> Schedule Info</h6>
+                </div>
+                <div class="card-body">
+                    <h5>{{ schedule.name }}</h5>
+                    <hr>
+                    <p class="mb-2"><strong>Branch:</strong> {{ schedule.branch }}</p>
+                    <p class="mb-2"><strong>Semester:</strong> {{ schedule.semester }}</p>
+                    <p class="mb-2"><strong>Type:</strong> {{ schedule.get_exam_type_display }}</p>
+                    <p class="mb-2"><strong>Dates:</strong> {{ schedule.start_date|date:"M d" }} - {{ schedule.end_date|date:"M d, Y" }}</p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i class="fas fa-check-circle"></i> Added Exams ({{ added_exams.count }})</h6>
+                </div>
+                <div class="card-body">
+                    {% if added_exams %}
+                    <ul class="list-group list-group-flush">
+                        {% for exam in added_exams %}
+                        <li class="list-group-item px-0">
+                            <small class="text-muted">{{ exam.subject.code }}</small><br>
+                            <strong>{{ exam.subject.name }}</strong><br>
+                            <small>{{ exam.date|date:"M d" }} at {{ exam.start_time|time:"g:i A" }}</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted mb-0">No exams added yet</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-plus-circle"></i> Step 2: Add Exams to Schedule</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="examForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Select Subject</strong></label>
+                            <select name="subject" class="form-select" required id="subjectSelect">
+                                <option value="">Choose a subject...</option>
+                                {% for subject in subjects %}
+                                    {% if subject.id not in added_subject_ids %}
+                                    <option value="{{ subject.id }}">{{ subject.code }} - {{ subject.name }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Subjects already added to this schedule are hidden</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Exam Date</strong></label>
+                            <input type="date" name="date" class="form-control" 
+                                   min="{{ schedule.start_date|date:'Y-m-d' }}" 
+                                   max="{{ schedule.end_date|date:'Y-m-d' }}" 
+                                   required>
+                            <small class="text-muted">Date must be between {{ schedule.start_date|date:"M d" }} and {{ schedule.end_date|date:"M d, Y" }}</small>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label"><strong>Start Time</strong></label>
+                                <input type="time" name="start_time" class="form-control" value="09:00" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label"><strong>End Time</strong></label>
+                                <input type="time" name="end_time" class="form-control" value="12:00" required>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" name="add_another" value="true" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Add & Add Another
+                            </button>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-check"></i> Add & Finish
+                            </button>
+                            <a href="{% url 'manage_exams' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Back to Exams
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+                <h6><i class="fas fa-lightbulb"></i> Tips:</h6>
+                <ul class="mb-0">
+                    <li>Click "Add & Add Another" to keep adding more exams</li>
+                    <li>Click "Add & Finish" when you're done adding exams</li>
+                    <li>You can always come back and add more exams later from the Manage Exams page</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-select first available subject
+document.addEventListener('DOMContentLoaded', function() {
+    const subjectSelect = document.getElementById('subjectSelect');
+    if (subjectSelect.options.length > 1) {
+        subjectSelect.selectedIndex = 1;
+    }
+});
+</script>
+{% endblock %}

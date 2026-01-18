@@ -39,31 +39,6 @@
         <div class="col-md-6 mb-4">
             <div class="card">
                 <div class="card-header">
-                    <i class="fas fa-chair"></i> My Seating Arrangements
-                </div>
-                <div class="card-body">
-                    {% if seating_arrangements %}
-                        <div class="list-group">
-                            {% for seat in seating_arrangements %}
-                            <a href="{% url 'view_seating' seat.exam.id %}" class="list-group-item list-group-item-action">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">{{ seat.exam.subject.name }}</h6>
-                                    <small>{{ seat.exam.date }}</small>
-                                </div>
-                                <p class="mb-1">Hall: {{ seat.hall.name }} | Seat: {{ seat.seat_number }}</p>
-                            </a>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-muted">No seating arrangements yet</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header">
                     <i class="fas fa-calendar-alt"></i> Upcoming Exams
                 </div>
                 <div class="card-body">
@@ -73,14 +48,50 @@
                             <div class="list-group-item">
                                 <div class="d-flex w-100 justify-content-between">
                                     <h6 class="mb-1">{{ exam.subject.name }}</h6>
-                                    <small>{{ exam.date }}</small>
+                                    <small>{{ exam.date|date:"M d, Y" }}</small>
                                 </div>
-                                <p class="mb-0">{{ exam.start_time }} - {{ exam.end_time }}</p>
+                                <p class="mb-1">
+                                    <span class="badge bg-info">{{ exam.subject.code }}</span>
+                                    {% if exam.schedule %}
+                                        <span class="badge {% if exam.schedule.exam_type == 'mid_term' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                            {{ exam.schedule.get_exam_type_display }}
+                                        </span>
+                                    {% endif %}
+                                </p>
+                                <small>{{ exam.start_time|time:"g:i A" }} - {{ exam.end_time|time:"g:i A" }}</small>
                             </div>
                             {% endfor %}
                         </div>
                     {% else %}
                         <p class="text-muted">No upcoming exams</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chair"></i> My Seating Arrangements
+                </div>
+                <div class="card-body">
+                    {% if seating_arrangements %}
+                        <div class="list-group">
+                            {% for seat in seating_arrangements %}
+                            <a href="{% url 'view_seating' seat.exam.id %}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ seat.exam.subject.name }}</h6>
+                                    <small>{{ seat.exam.date|date:"M d, Y" }}</small>
+                                </div>
+                                <p class="mb-1">
+                                    <strong>Hall:</strong> {{ seat.hall.name }} | 
+                                    <strong>Seat:</strong> <span class="badge bg-primary">{{ seat.seat_number }}</span>
+                                </p>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No seating arrangements yet</p>
                     {% endif %}
                 </div>
             </div>

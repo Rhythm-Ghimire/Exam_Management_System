@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-clipboard-list"></i> Add New Exam
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="examForm">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Branch</label>
+                                <select name="branch" id="branch" class="form-select" required>
+                                    <option value="">Select Branch</option>
+                                    <option value="BCA">BCA</option>
+                                    <option value="BScCSIT">BScCSIT</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Semester</label>
+                                <select name="semester" id="semester" class="form-select" required>
+                                    <option value="">Select Semester</option>
+                                    {% for i in "12345678" %}
+                                    <option value="{{ i }}">{{ i }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Exam Type</label>
+                            <select name="exam_type" class="form-select" required>
+                                <option value="">Select Exam Type</option>
+                                <option value="mid_term">Mid Term</option>
+                                <option value="final_term">Final Term</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Subject</label>
+                            <select name="subject" id="subject" class="form-select" required>
+                                <option value="">Select Subject</option>
+                            </select>
+                            <small class="text-muted">Select branch and semester first</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Exam Date</label>
+                            <input type="date" name="date" class="form-control" required>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Start Time</label>
+                                <input type="time" name="start_time" class="form-control" value="09:00" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">End Time</label>
+                                <input type="time" name="end_time" class="form-control" value="12:00" required>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Exam
+                            </button>
+                            <a href="{% url 'manage_exams' %}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Load subjects based on branch and semester
+const branchSelect = document.getElementById('branch');
+const semesterSelect = document.getElementById('semester');
+const subjectSelect = document.getElementById('subject');
+
+function loadSubjects() {
+    const branch = branchSelect.value;
+    const semester = semesterSelect.value;
+    
+    if (!branch || !semester) {
+        subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+        return;
+    }
+    
+    // Fetch subjects via AJAX
+    fetch(`/api/subjects/?branch=${branch}&semester=${semester}`)
+        .then(response => response.json())
+        .then(data => {
+            subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+            data.subjects.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject.id;
+                option.textContent = `${subject.code} - ${subject.name}`;
+                subjectSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading subjects:', error);
+        });
+}
+
+branchSelect.addEventListener('change', loadSubjects);
+semesterSelect.addEventListener('change', loadSubjects);
+</script>
+{% endblock %}

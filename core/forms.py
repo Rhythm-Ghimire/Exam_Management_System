@@ -43,7 +43,7 @@ class StudentForm(forms.ModelForm):
 class SubjectForm(forms.ModelForm):
     class Meta:
         model = Subject
-        fields = ['code', 'name', 'semester']
+        fields = ['code', 'name', 'semester', 'branch']
 
 
 class ExamHallForm(forms.ModelForm):
@@ -61,7 +61,7 @@ class InvigilatorForm(forms.ModelForm):
 class ExamForm(forms.ModelForm):
     class Meta:
         model = Exam
-        fields = ['subject', 'date', 'start_time', 'end_time', 'semester']
+        fields = ['subject', 'date', 'start_time', 'end_time', 'schedule']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
             'start_time': forms.TimeInput(attrs={'type': 'time'}),

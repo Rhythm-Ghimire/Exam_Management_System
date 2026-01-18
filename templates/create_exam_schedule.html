@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-calendar-plus"></i> Step 1: Create Exam Schedule</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> First, create an exam schedule by selecting the branch, semester, and exam type. Then you'll be able to add individual exams to this schedule.
+                    </div>
+                    
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label"><strong>Select Branch</strong></label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="branch" id="bsccsit" value="BScCSIT" required>
+                                        <label class="form-check-label" for="bsccsit">
+                                            <strong>BScCSIT</strong> - Bachelor of Science in Computer Science and Information Technology
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="branch" id="bca" value="BCA" required>
+                                        <label class="form-check-label" for="bca">
+                                            <strong>BCA</strong> - Bachelor of Computer Applications
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label"><strong>Select Semester</strong></label>
+                            <div class="row">
+                                {% for i in "12345678" %}
+                                <div class="col-md-3 mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="semester" id="sem{{ i }}" value="{{ i }}" required>
+                                        <label class="form-check-label" for="sem{{ i }}">
+                                            Semester {{ i }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label"><strong>Select Exam Type</strong></label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="exam_type" id="midterm" value="mid_term" required>
+                                        <label class="form-check-label" for="midterm">
+                                            <strong>Mid Term Examination</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="exam_type" id="finalterm" value="final_term" required>
+                                        <label class="form-check-label" for="finalterm">
+                                            <strong>Final Term Examination</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label"><strong>Start Date</strong></label>
+                                <input type="date" name="start_date" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label"><strong>End Date</strong></label>
+                                <input type="date" name="end_date" class="form-control" required>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-arrow-right"></i> Next: Add Exams
+                            </button>
+                            <a href="{% url 'manage_exams' %}" class="btn btn-secondary btn-lg">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -3,9 +3,14 @@ from django.contrib.auth.models import User
 
 
 class Student(models.Model):
+    BRANCH_CHOICES = [
+        ('BCA', 'BCA'),
+        ('BScCSIT', 'BScCSIT'),
+    ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     roll_number = models.CharField(max_length=20, unique=True)
-    branch = models.CharField(max_length=100)
+    branch = models.CharField(max_length=100, choices=BRANCH_CHOICES)
     semester = models.IntegerField()
     fees_paid = models.BooleanField(default=False)
     attendance = models.FloatField(default=0.0)
@@ -18,9 +23,15 @@ class Student(models.Model):
 
 
 class Subject(models.Model):
+    BRANCH_CHOICES = [
+        ('BCA', 'BCA'),
+        ('BScCSIT', 'BScCSIT'),
+    ]
+    
     code = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=200)
     semester = models.IntegerField()
+    branch = models.CharField(max_length=20, choices=BRANCH_CHOICES, default='BScCSIT')
     
     def __str__(self):
         return f"{self.code} - {self.name}"
@@ -44,15 +55,50 @@ class Invigilator(models.Model):
         return self.name
 
 
+class ExamSchedule(models.Model):
+    """Groups multiple exams together (e.g., BScCSIT Semester 2 Mid Term)"""
+    BRANCH_CHOICES = [
+        ('BCA', 'BCA'),
+        ('BScCSIT', 'BScCSIT'),
+    ]
+    
+    EXAM_TYPE_CHOICES = [
+        ('mid_term', 'Mid Term'),
+        ('final_term', 'Final Term'),
+    ]
+    
+    name = models.CharField(max_length=200)  # e.g., "BScCSIT Semester 2 Mid Term 2026"
+    branch = models.CharField(max_length=20, choices=BRANCH_CHOICES)
+    semester = models.IntegerField()
+    exam_type = models.CharField(max_length=20, choices=EXAM_TYPE_CHOICES)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return self.name
+    
+    class Meta:
+        ordering = ['-created_at']
+
+
 class Exam(models.Model):
+    schedule = models.ForeignKey(ExamSchedule, on_delete=models.CASCADE, related_name='exams', null=True, blank=True)
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
     date = models.DateField()
     start_time = models.TimeField()
     end_time = models.TimeField()
-    semester = models.IntegerField()
     
     def __str__(self):
         return f"{self.subject.name} - {self.date}"
+    
+    @property
+    def semester(self):
+        return self.schedule.semester if self.schedule else self.subject.semester
+    
+    @property
+    def exam_type(self):
+        return self.schedule.get_exam_type_display() if self.schedule else "N/A"
     
     class Meta:
         ordering = ['date', 'start_time']

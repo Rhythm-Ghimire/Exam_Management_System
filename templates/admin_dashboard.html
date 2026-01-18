@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Admin Dashboard</h2>
+    
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <a href="{% url 'students_overview' %}" class="text-decoration-none">
+                <div class="stat-card">
+                    <div class="icon primary">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h3>{{ total_students }}</h3>
+                    <p>Total Students</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'manage_subjects' %}" class="text-decoration-none">
+                <div class="stat-card">
+                    <div class="icon success">
+                        <i class="fas fa-book"></i>
+                    </div>
+                    <h3>{{ total_subjects }}</h3>
+                    <p>Subjects</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'manage_exams' %}" class="text-decoration-none">
+                <div class="stat-card">
+                    <div class="icon warning">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                    <h3>{{ total_exams }}</h3>
+                    <p>Exams</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'manage_halls' %}" class="text-decoration-none">
+                <div class="stat-card">
+                    <div class="icon danger">
+                        <i class="fas fa-door-open"></i>
+                    </div>
+                    <h3>{{ total_halls }}</h3>
+                    <p>Exam Halls</p>
+                </div>
+            </a>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-check-circle"></i> Eligible Students
+                </div>
+                <div class="card-body">
+                    <h3 class="text-primary">{{ eligible_students }}</h3>
+                    <p class="mb-0">Students who have paid fees and have 75%+ attendance</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-calendar-alt"></i> Quick Actions
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'add_student' %}" class="btn btn-primary">
+                            <i class="fas fa-user-plus"></i> Add Student
+                        </a>
+                        <a href="{% url 'create_exam_schedule' %}" class="btn btn-success">
+                            <i class="fas fa-plus-circle"></i> Create Exam Schedule
+                        </a>
+                        <a href="{% url 'add_hall' %}" class="btn btn-warning">
+                            <i class="fas fa-door-open"></i> Add Exam Hall
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

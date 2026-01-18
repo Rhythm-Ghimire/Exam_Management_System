@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-calendar-alt"></i> Exam Timetable</h2>
+        <button onclick="window.print()" class="btn btn-primary">
+            <i class="fas fa-print"></i> Print Timetable
+        </button>
+    </div>
+    
+    {% if schedules %}
+        {% for schedule in schedules %}
+        <div class="card mb-4">
+            <div class="card-header {% if schedule.branch == 'BScCSIT' %}bg-primary{% else %}bg-success{% endif %} text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">{{ schedule.name }}</h5>
+                        <small><i class="fas fa-calendar"></i> {{ schedule.start_date|date:"M d, Y" }} to {{ schedule.end_date|date:"M d, Y" }}</small>
+                    </div>
+                    <div>
+                        <span class="badge {% if schedule.exam_type == 'mid_term' %}bg-warning text-dark{% else %}bg-light text-dark{% endif %}">
+                            {{ schedule.get_exam_type_display }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if schedule.exams.all %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Day</th>
+                                <th>Subject</th>
+                                <th>Code</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for exam in schedule.exams.all %}
+                            <tr>
+                                <td><strong>{{ exam.date|date:"M d, Y" }}</strong></td>
+                                <td>{{ exam.date|date:"l" }}</td>
+                                <td>{{ exam.subject.name }}</td>
+                                <td><span class="badge {% if schedule.branch == 'BScCSIT' %}bg-info{% else %}bg-success{% endif %}">{{ exam.subject.code }}</span></td>
+                                <td>{{ exam.start_time|time:"g:i A" }} - {{ exam.end_time|time:"g:i A" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    No exams scheduled yet for this schedule.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-info-circle"></i> Important Instructions:</h6>
+                    <ul class="mb-0">
+                        <li>Students must arrive at least 15 minutes before the exam starts</li>
+                        <li>Bring a valid student ID card to the examination hall</li>
+                        <li>Mobile phones and electronic devices are strictly prohibited</li>
+                        <li>Late entries will not be allowed after 30 minutes of exam start time</li>
+                        <li>Check your seating arrangement before the exam day</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-warning text-center">
+            <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+            <h5>No Exams Scheduled</h5>
+            <p class="mb-0">There are currently no exams scheduled. Please check back later.</p>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    @media print {
+        .navbar, .btn, .alert, .card-header {
+            display: none !important;
+        }
+        
+        .card {
+            box-shadow: none !important;
+            border: 1px solid #ddd !important;
+            page-break-inside: avoid;
+        }
+        
+        table {
+            page-break-inside: avoid;
+        }
+    }
+</style>
+{% endblock %}
