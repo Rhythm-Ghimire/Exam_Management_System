@@ -36,11 +36,8 @@ urlpatterns = [
     path('exams/<int:exam_id>/seating/download/', views.download_seating_pdf, name='download_seating_pdf'),
     
     # Results
-    path('results/', views.results_home, name='results_home'),
-    path('results/<str:branch>/', views.results_semester_list, name='results_semester_list'),
-    path('results/<str:branch>/<int:semester>/', views.results_student_list, name='results_student_list'),
-    path('results/<str:branch>/<int:semester>/<int:student_id>/', views.student_marksheet, name='student_marksheet'),
-    path('results/<str:branch>/<int:semester>/<int:student_id>/add/', views.add_student_results, name='add_student_results'),
+    path('results/', views.manage_results, name='manage_results'),
+    path('results/add/', views.add_result, name='add_result'),
     
     # Analytics
     path('analytics/', views.performance_analytics, name='performance_analytics'),

@@ -268,10 +268,15 @@ def manage_subjects(request):
         bsccsit_subjects[sem] = Subject.objects.filter(branch='BScCSIT', semester=sem).order_by('code')
         bca_subjects[sem] = Subject.objects.filter(branch='BCA', semester=sem).order_by('code')
     
+    print(f"BScCSIT subjects: {sum(len(v) for v in bsccsit_subjects.values())}")
+    print(f"BCA subjects: {sum(len(v) for v in bca_subjects.values())}")
+    
     context = {
         'bsccsit_subjects': bsccsit_subjects,
         'bca_subjects': bca_subjects,
     }
+    
+    # IMPORTANT: Make sure this line says manage_subjects.html
     return render(request, 'manage_subjects.html', context)
 
 
@@ -688,150 +693,6 @@ def download_seating_pdf(request, exam_id):
     response['Content-Disposition'] = f'attachment; filename="seating_{exam.subject.code}_{exam.date}.pdf"'
     
     return response
-
-
-@login_required
-@user_passes_test(is_admin)
-def results_home(request):
-    """Step 1: Select Branch"""
-    branches = [
-        {'code': 'BScCSIT', 'name': 'BScCSIT - Bachelor of Science in Computer Science and Information Technology'},
-        {'code': 'BCA', 'name': 'BCA - Bachelor of Computer Applications'}
-    ]
-    return render(request, 'results_home.html', {'branches': branches})
-
-
-@login_required
-@user_passes_test(is_admin)
-def results_semester_list(request, branch):
-    """Step 2: Select Semester"""
-    semesters = range(1, 9)
-    student_counts = {}
-    
-    for sem in semesters:
-        student_counts[sem] = Student.objects.filter(branch=branch, semester=sem).count()
-    
-    context = {
-        'branch': branch,
-        'semesters': semesters,
-        'student_counts': student_counts
-    }
-    return render(request, 'results_semester_list.html', context)
-
-
-@login_required
-@user_passes_test(is_admin)
-def results_student_list(request, branch, semester):
-    """Step 3: Select Student"""
-    students = Student.objects.filter(
-        branch=branch,
-        semester=semester
-    ).select_related('user').order_by('roll_number')
-    
-    # Get result completion status for each student
-    subjects = Subject.objects.filter(branch=branch, semester=semester)
-    subject_count = subjects.count()
-    
-    student_data = []
-    for student in students:
-        result_count = Result.objects.filter(
-            student=student,
-            subject__in=subjects
-        ).count()
-        
-        student_data.append({
-            'student': student,
-            'results_entered': result_count,
-            'total_subjects': subject_count,
-            'is_complete': result_count == subject_count and subject_count > 0
-        })
-    
-    context = {
-        'branch': branch,
-        'semester': semester,
-        'student_data': student_data,
-        'subjects': subjects
-    }
-    return render(request, 'results_student_list.html', context)
-
-
-@login_required
-@user_passes_test(is_admin)
-def student_marksheet(request, branch, semester, student_id):
-    """Step 4: View/Edit Student Marksheet"""
-    student = get_object_or_404(Student, id=student_id, branch=branch, semester=semester)
-    subjects = Subject.objects.filter(branch=branch, semester=semester).order_by('code')
-    
-    # Get existing results
-    results = {}
-    for subject in subjects:
-        result = Result.objects.filter(student=student, subject=subject).first()
-        results[subject.id] = result
-    
-    context = {
-        'student': student,
-        'subjects': subjects,
-        'results': results,
-        'branch': branch,
-        'semester': semester
-    }
-    return render(request, 'student_marksheet.html', context)
-
-
-@login_required
-@user_passes_test(is_admin)
-def add_student_results(request, branch, semester, student_id):
-    """Add/Update results for all subjects of a student"""
-    student = get_object_or_404(Student, id=student_id, branch=branch, semester=semester)
-    subjects = Subject.objects.filter(branch=branch, semester=semester).order_by('code')
-    
-    if request.method == 'POST':
-        updated_count = 0
-        created_count = 0
-        
-        for subject in subjects:
-            marks_key = f'marks_{subject.id}'
-            marks = request.POST.get(marks_key)
-            
-            if marks and marks.strip():
-                marks_value = float(marks)
-                
-                # Get or create result
-                result, created = Result.objects.get_or_create(
-                    student=student,
-                    subject=subject,
-                    defaults={
-                        'marks_obtained': marks_value,
-                        'max_marks': 100,
-                        'exam': None  # Can be linked to exam if needed
-                    }
-                )
-                
-                if not created:
-                    result.marks_obtained = marks_value
-                    result.save()
-                    updated_count += 1
-                else:
-                    created_count += 1
-        
-        messages.success(request, f'Results saved! Created: {created_count}, Updated: {updated_count}')
-        return redirect('student_marksheet', branch=branch, semester=semester, student_id=student_id)
-    
-    # Get existing results
-    existing_results = {}
-    for subject in subjects:
-        result = Result.objects.filter(student=student, subject=subject).first()
-        if result:
-            existing_results[subject.id] = result.marks_obtained
-    
-    context = {
-        'student': student,
-        'subjects': subjects,
-        'existing_results': existing_results,
-        'branch': branch,
-        'semester': semester
-    }
-    return render(request, 'add_student_results.html', context)
 
 
 @login_required
