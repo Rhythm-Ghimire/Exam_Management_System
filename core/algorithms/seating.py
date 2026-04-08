@@ -1,59 +1,118 @@
 from ..models import SeatingArrangement
-from collections import defaultdict
 
 
 def generate_seating_arrangement(exam, students, halls):
-    """
-    Generate seating arrangement using Greedy Algorithm with alternate seating
-    and Hash-Based Grouping for branch mixing
-    """
-    total_students = students.count()
-    total_capacity = sum(hall.capacity for hall in halls)
     
-    # Check if we have enough capacity (with alternate seating - 50% capacity)
-    usable_capacity = total_capacity // 2
-    if total_students > usable_capacity:
+    student_list = list(students.order_by('branch', 'semester', 'roll_number'))
+    total_students = len(student_list)
+    
+    if total_students == 0:
         return False
     
-    # Group students by branch using hash map
-    branch_groups = defaultdict(list)
-    for student in students:
-        branch_groups[student.branch].append(student)
+    # Get available halls sorted by name
+    available_halls = list(halls.filter(is_available=True).order_by('name'))
     
-    # Interleave students from different branches to avoid same-branch adjacency
-    mixed_students = []
-    branches = list(branch_groups.keys())
+    if not available_halls:
+        return False
     
-    while any(branch_groups.values()):
-        for branch in branches:
-            if branch_groups[branch]:
-                mixed_students.append(branch_groups[branch].pop(0))
+    # Group students by branch_semester
+    from collections import defaultdict
+    student_groups = defaultdict(list)
+    for student in student_list:
+        key = f"{student.branch}_sem{student.semester}"
+        student_groups[key].append(student)
     
-    # Assign students to halls with alternate seating (Greedy approach)
+    # Check if all students are same group
+    if len(student_groups) == 1:
+        # Same branch+semester - sequential by roll number
+        return assign_single_group_sequential(exam, student_list, available_halls)
+    else:
+        # Mixed groups - pair different groups
+        return assign_mixed_groups_paired(exam, student_list, available_halls, student_groups)
+
+
+def assign_single_group_sequential(exam, students, halls):
+   
     student_index = 0
+    hall_index = 0
     
-    for hall in halls:
-        # Use alternate seats (1, 3, 5, 7... or even/odd pattern)
-        max_seats = hall.capacity // 2  # Alternate seating
-        seat_number = 1
+    while student_index < len(students) and hall_index < len(halls):
+        hall = halls[hall_index]
+        num_benches = hall.capacity // 2
         
-        for _ in range(max_seats):
-            if student_index >= len(mixed_students):
+        # Fill this hall - one student per bench
+        for bench_num in range(1, num_benches + 1):
+            if student_index >= len(students):
                 break
-            
-            student = mixed_students[student_index]
             
             SeatingArrangement.objects.create(
                 exam=exam,
-                student=student,
+                student=students[student_index],
                 hall=hall,
-                seat_number=seat_number
+                seat_number=bench_num
             )
-            
-            seat_number += 2  # Alternate seats: 1, 3, 5, 7...
             student_index += 1
         
-        if student_index >= len(mixed_students):
-            break
+        # Move to next hall
+        hall_index += 1
     
-    return True
+    return student_index == len(students)
+
+
+def assign_mixed_groups_paired(exam, students, halls, student_groups):
+    
+    # Interleave students from different groups
+    group_keys = list(student_groups.keys())
+    max_length = max(len(group) for group in student_groups.values())
+    
+    mixed_students = []
+    for i in range(max_length):
+        for key in group_keys:
+            if i < len(student_groups[key]):
+                mixed_students.append(student_groups[key][i])
+    
+    student_index = 0
+    hall_index = 0
+    
+    while student_index < len(mixed_students) and hall_index < len(halls):
+        hall = halls[hall_index]
+        num_benches = hall.capacity // 2
+        
+        # Fill this hall
+        for bench_num in range(1, num_benches + 1):
+            if student_index >= len(mixed_students):
+                break
+            
+            # First student on bench
+            student1 = mixed_students[student_index]
+            SeatingArrangement.objects.create(
+                exam=exam,
+                student=student1,
+                hall=hall,
+                seat_number=bench_num
+            )
+            student_index += 1
+            
+            # Try to add second student
+            if student_index < len(mixed_students):
+                student2 = mixed_students[student_index]
+                
+                # Check if different group
+                can_pair = (student1.branch != student2.branch or 
+                           student1.semester != student2.semester)
+                
+                if can_pair:
+                    # Same bench
+                    SeatingArrangement.objects.create(
+                        exam=exam,
+                        student=student2,
+                        hall=hall,
+                        seat_number=bench_num
+                    )
+                    student_index += 1
+                # If can't pair, student2 goes to next bench (don't increment here)
+        
+        # Move to next hall
+        hall_index += 1
+    
+    return student_index == len(mixed_students)

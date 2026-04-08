@@ -3,81 +3,128 @@ from collections import defaultdict
 
 
 def assign_invigilators(exam, halls, invigilators):
-    """
-    Assign invigilators using Backtracking Algorithm to ensure no repetition
-    on the same day and fair distribution
-    """
-    # Get all exams on the same day
-    same_day_exams = Exam.objects.filter(date=exam.date)
-    
-    # Track which invigilators are already assigned on this day
-    assigned_today = defaultdict(set)
-    for same_exam in same_day_exams:
-        if same_exam.id != exam.id:
-            assignments = InvigilatorAssignment.objects.filter(exam=same_exam)
-            for assignment in assignments:
-                assigned_today[assignment.invigilator.id].add(same_exam.id)
-    
-    # Get halls that need invigilators for this exam
-    used_halls = set()
-    from ..models import SeatingArrangement
-    seating = SeatingArrangement.objects.filter(exam=exam).values_list('hall_id', flat=True).distinct()
-    halls_needed = [hall for hall in halls if hall.id in seating]
-    
-    # Convert invigilators to list for indexing
+   
     invigilator_list = list(invigilators)
-    assignments = []
-    
-    def backtrack(hall_index, used_invigilators):
-        # Base case: all halls assigned
-        if hall_index >= len(halls_needed):
-            return True
-        
-        hall = halls_needed[hall_index]
-        
-        # Try each invigilator
-        for invigilator in invigilator_list:
-            # Skip if already used in this exam or assigned too many times today
-            if invigilator.id in used_invigilators:
-                continue
-            
-            # Prefer invigilators with fewer assignments today
-            if len(assigned_today[invigilator.id]) > 2:  # Max 2 duties per day
-                continue
-            
-            # Make assignment
-            assignments.append({
-                'exam': exam,
-                'invigilator': invigilator,
-                'hall': hall
-            })
-            used_invigilators.add(invigilator.id)
-            
-            # Recurse
-            if backtrack(hall_index + 1, used_invigilators):
-                return True
-            
-            # Backtrack
-            assignments.pop()
-            used_invigilators.remove(invigilator.id)
-        
+    if not invigilator_list:
         return False
-    
-    # Start backtracking
-    if backtrack(0, set()):
-        # Create all assignments
-        for assignment_data in assignments:
-            InvigilatorAssignment.objects.create(**assignment_data)
+
+    # Find halls actually used by this exam
+    from ..models import SeatingArrangement
+    used_hall_ids = SeatingArrangement.objects.filter(exam=exam).values_list('hall_id', flat=True).distinct()
+    halls_needed = [h for h in halls if h.id in used_hall_ids]
+    if not halls_needed:
+        return False
+
+    # --- Build context for this date ---
+    # How many duties each invigilator already has today
+    duties_today = defaultdict(int)
+    # Which hall each invigilator was in yesterday (for rotation)
+    hall_yesterday = defaultdict(set)
+
+    same_day_exams = Exam.objects.filter(date=exam.date).exclude(id=exam.id)
+    for e in same_day_exams:
+        for a in InvigilatorAssignment.objects.filter(exam=e):
+            duties_today[a.invigilator.id] += 1
+
+    # Look at assignments from any exam the day before
+    from datetime import timedelta
+    yesterday = exam.date - timedelta(days=1)
+    prev_day_exams = Exam.objects.filter(date=yesterday)
+    for e in prev_day_exams:
+        for a in InvigilatorAssignment.objects.filter(exam=e):
+            hall_yesterday[a.invigilator.id].add(a.hall.id)
+
+    # Sort invigilators by fewest duties today first (fairness)
+    def sort_key(inv):
+        return duties_today[inv.id]
+
+    sorted_invigs = sorted(invigilator_list, key=sort_key)
+
+    assignments = []
+
+    def backtrack(hall_idx, used_ids):
+        if hall_idx >= len(halls_needed):
+            return True
+
+        hall = halls_needed[hall_idx]
+
+        for inv in sorted_invigs:
+            if inv.id in used_ids:
+                continue
+            if duties_today[inv.id] >= 2:
+                continue
+            # Prefer not putting same invigilator in same hall as yesterday
+            # (soft constraint — only skip if there's another option)
+            was_here_yesterday = hall.id in hall_yesterday.get(inv.id, set())
+            if was_here_yesterday and len(sorted_invigs) > len(halls_needed):
+                continue  # skip only if we have enough invigilators to avoid it
+
+            assignments.append({'exam': exam, 'invigilator': inv, 'hall': hall})
+            used_ids.add(inv.id)
+            duties_today[inv.id] += 1
+
+            if backtrack(hall_idx + 1, used_ids):
+                return True
+
+            assignments.pop()
+            used_ids.remove(inv.id)
+            duties_today[inv.id] -= 1
+
+        # Retry without the rotation constraint if we get stuck
+        for inv in sorted_invigs:
+            if inv.id in used_ids:
+                continue
+            if duties_today[inv.id] >= 2:
+                continue
+
+            assignments.append({'exam': exam, 'invigilator': inv, 'hall': hall})
+            used_ids.add(inv.id)
+            duties_today[inv.id] += 1
+
+            if backtrack(hall_idx + 1, used_ids):
+                return True
+
+            assignments.pop()
+            used_ids.remove(inv.id)
+            duties_today[inv.id] -= 1
+
+        return False
+
+    success = backtrack(0, set())
+
+    if success:
+        for a in assignments:
+            InvigilatorAssignment.objects.create(**a)
         return True
-    else:
-        # Fallback: simple greedy assignment if backtracking fails
-        invigilator_index = 0
-        for hall in halls_needed:
-            invigilator = invigilator_list[invigilator_index % len(invigilator_list)]
-            InvigilatorAssignment.objects.create(
-                exam=exam,
-                invigilator=invigilator,
-                hall=hall
-            )
-            invigilator_index += 1
-        return True
+
+    # --- Greedy fallback with rotation ---
+    # Cycle through invigilators, preferring those who weren't in that hall yesterday
+    used_ids = set()
+    inv_cycle = list(sorted_invigs)
+    idx = 0
+    for hall in halls_needed:
+        # Try to find someone who wasn't in this hall yesterday
+        assigned = False
+        for attempt in range(len(inv_cycle)):
+            inv = inv_cycle[(idx + attempt) % len(inv_cycle)]
+            if inv.id in used_ids:
+                continue
+            if hall.id in hall_yesterday.get(inv.id, set()):
+                continue
+            InvigilatorAssignment.objects.create(exam=exam, invigilator=inv, hall=hall)
+            used_ids.add(inv.id)
+            idx = (idx + attempt + 1) % len(inv_cycle)
+            assigned = True
+            break
+
+        if not assigned:
+            # Just pick anyone available
+            for attempt in range(len(inv_cycle)):
+                inv = inv_cycle[(idx + attempt) % len(inv_cycle)]
+                if inv.id not in used_ids:
+                    InvigilatorAssignment.objects.create(exam=exam, invigilator=inv, hall=hall)
+                    used_ids.add(inv.id)
+                    idx = (idx + attempt + 1) % len(inv_cycle)
+                    break
+
+    return True

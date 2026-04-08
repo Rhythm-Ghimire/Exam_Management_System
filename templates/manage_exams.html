@@ -2,68 +2,332 @@
 
 {% block content %}
 <div class="container mt-4">
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="fas fa-clipboard-list"></i> Manage Exams</h2>
         <a href="{% url 'create_exam_schedule' %}" class="btn btn-primary btn-lg">
             <i class="fas fa-plus"></i> Create Exam Schedule
         </a>
     </div>
-    
-    <div class="card">
-        <div class="card-body">
-            <div class="mb-3">
-                <input type="text" id="searchInput" class="form-control" placeholder="Search exams...">
-            </div>
-            
-            <div class="table-responsive">
-                <table class="table table-hover" id="examsTable">
-                    <thead>
-                        <tr>
-                            <th>Subject</th>
-                            <th>Code</th>
-                            <th>Date</th>
-                            <th>Time</th>
-                            <th>Semester</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for exam in exams %}
-                        <tr>
-                            <td>{{ exam.subject.name }}</td>
-                            <td><span class="badge bg-info">{{ exam.subject.code }}</span></td>
-                            <td>{{ exam.date|date:"M d, Y" }}</td>
-                            <td>{{ exam.start_time|time:"g:i A" }} - {{ exam.end_time|time:"g:i A" }}</td>
-                            <td>{{ exam.semester }}</td>
-                            <td>
-                                <div class="btn-group" role="group">
-                                    <a href="{% url 'view_seating' exam.id %}" class="btn btn-sm btn-info" title="View Seating">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="{% url 'generate_seating' exam.id %}" class="btn btn-sm btn-success" 
-                                       onclick="return confirm('Generate seating arrangement for {{ exam.subject.name }}?')" 
-                                       title="Generate Seating">
-                                        <i class="fas fa-cogs"></i>
-                                    </a>
-                                    <a href="{% url 'download_seating_pdf' exam.id %}" class="btn btn-sm btn-warning" title="Download PDF">
-                                        <i class="fas fa-file-pdf"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="7" class="text-center">No exams found</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
 
-<script>
-    searchTable('searchInput', 'examsTable');
-</script>
+    <!-- Exam Type Tabs -->
+    <ul class="nav nav-tabs mb-4" id="examTypeTabs">
+        <li class="nav-item">
+            <a class="nav-link active" id="mid-tab" data-bs-toggle="tab" href="#mid-term">
+                <i class="fas fa-book-open"></i> Mid Term
+                {% if mid_term_schedules %}
+                    <span class="badge bg-primary ms-1">{{ mid_term_schedules|length }}</span>
+                {% endif %}
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="final-tab" data-bs-toggle="tab" href="#final-term">
+                <i class="fas fa-graduation-cap"></i> Final Term
+                {% if final_term_schedules %}
+                    <span class="badge bg-success ms-1">{{ final_term_schedules|length }}</span>
+                {% endif %}
+            </a>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+
+        <!-- ===== MID TERM TAB ===== -->
+        <div class="tab-pane fade show active" id="mid-term">
+            {% if mid_term_schedules %}
+
+                <!-- Global Seating Generator -->
+                <div class="card mb-4 border-warning">
+                    <div class="card-body d-flex justify-content-between align-items-center py-3">
+                        <div>
+                            <h6 class="mb-1 text-warning"><i class="fas fa-cogs"></i> Mid Term — Smart Seat Plan Generator</h6>
+                            <small class="text-muted">
+                                Checks all Mid Term exam dates. If multiple semesters share a date → interleaves students (one per sem per bench).
+                                If only one semester that day → spreads students one-per-bench to prevent cheating.
+                            </small>
+                        </div>
+                        <div class="ms-3 flex-shrink-0">
+                            {% if mid_seating_done %}
+                            <a href="{% url 'generate_seating_by_examtype' 'mid_term' %}"
+                               class="btn btn-warning"
+                               onclick="return confirm('REGENERATE ALL MID TERM SEATING\n\nThis will DELETE all existing Mid Term seating plans and regenerate them.\n\nContinue?')">
+                                <i class="fas fa-redo"></i> Regenerate All Seating
+                            </a>
+                            {% else %}
+                            <a href="{% url 'generate_seating_by_examtype' 'mid_term' %}"
+                               class="btn btn-success btn-lg"
+                               onclick="return confirm('GENERATE MID TERM SEAT PLANS\n\nThis will:\n- Check all Mid Term exam dates\n- Interleave students if multiple sems share a date\n- Spread students if only 1 sem on a date\n- Assign invigilators\n\nGenerate now?')">
+                                <i class="fas fa-cogs"></i> Generate Seat Plans
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% for schedule in mid_term_schedules %}
+                <div class="card mb-3">
+                    <div class="card-header {% if schedule.branch == 'BScCSIT' %}bg-primary{% else %}bg-success{% endif %} text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="fas fa-calendar-alt"></i> {{ schedule.name }}
+                                </h6>
+                                <small>
+                                    <i class="fas fa-calendar"></i>
+                                    {{ schedule.start_date|date:"M d" }} – {{ schedule.end_date|date:"M d, Y" }}
+                                    &nbsp;|&nbsp;
+                                    <i class="fas fa-graduation-cap"></i>
+                                    {{ schedule.branch }} · Semester {{ schedule.semester }}
+                                </small>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center">
+                                <a href="{% url 'add_exam_to_schedule' schedule.id %}" class="btn btn-sm btn-light">
+                                    <i class="fas fa-plus"></i> Add Exams
+                                </a>
+                                <button class="btn btn-sm btn-danger"
+                                        onclick="if(confirm('Delete entire schedule and all its exams?')) window.location.href='{% url 'delete_schedule' schedule.id %}'">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        {% if schedule.exams.all %}
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Day</th>
+                                        <th>Subject</th>
+                                        <th>Code</th>
+                                        <th>Time</th>
+                                        <th>Seating</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for exam in schedule.exams.all %}
+                                    {% with sc=exam.seatingarrangement_set.count %}
+                                    <tr>
+                                        <td><strong>{{ exam.date|date:"M d, Y" }}</strong></td>
+                                        <td><small class="text-muted">{{ exam.date|date:"l" }}</small></td>
+                                        <td>{{ exam.subject.name }}</td>
+                                        <td>
+                                            <span class="badge {% if schedule.branch == 'BScCSIT' %}bg-info{% else %}bg-success{% endif %}">
+                                                {{ exam.subject.code }}
+                                            </span>
+                                        </td>
+                                        <td>{{ exam.start_time|time:"g:i A" }} – {{ exam.end_time|time:"g:i A" }}</td>
+                                        <td>
+                                            {% if sc > 0 %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check-circle"></i> {{ sc }} seated
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Pending</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                {% if sc > 0 %}
+                                                <a href="{% url 'view_seating' exam.id %}" class="btn btn-primary" title="View Seating">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{% url 'download_seating_pdf' exam.id %}" class="btn btn-warning" title="PDF">
+                                                    <i class="fas fa-file-pdf"></i>
+                                                </a>
+                                                {% endif %}
+                                                <a href="{% url 'delete_exam' exam.id %}" class="btn btn-danger"
+                                                   onclick="return confirm('Delete this exam?')" title="Delete">
+                                                    <i class="fas fa-trash"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endwith %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-2 bg-light border-top">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i>
+                                {{ schedule.exams.count }} exam(s) · Students keep the same seat for all exams in this schedule.
+                            </small>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning m-3 mb-0">
+                            No exams added yet.
+                            <a href="{% url 'add_exam_to_schedule' schedule.id %}" class="alert-link">Add exams now</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+
+            {% else %}
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-book-open fa-4x text-muted mb-3"></i>
+                        <h4>No Mid Term Schedules</h4>
+                        <p class="text-muted mb-4">Create a Mid Term schedule to get started.</p>
+                        <a href="{% url 'create_exam_schedule' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus"></i> Create Schedule
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- ===== FINAL TERM TAB ===== -->
+        <div class="tab-pane fade" id="final-term">
+            {% if final_term_schedules %}
+
+                <!-- Global Seating Generator -->
+                <div class="card mb-4 border-success">
+                    <div class="card-body d-flex justify-content-between align-items-center py-3">
+                        <div>
+                            <h6 class="mb-1 text-success"><i class="fas fa-cogs"></i> Final Term — Smart Seat Plan Generator</h6>
+                            <small class="text-muted">
+                                Checks all Final Term exam dates. If multiple semesters share a date → interleaves students.
+                                If only one semester that day → spreads students one-per-bench.
+                            </small>
+                        </div>
+                        <div class="ms-3 flex-shrink-0">
+                            {% if final_seating_done %}
+                            <a href="{% url 'generate_seating_by_examtype' 'final_term' %}"
+                               class="btn btn-warning"
+                               onclick="return confirm('REGENERATE ALL FINAL TERM SEATING\n\nThis will DELETE all existing Final Term seating plans and regenerate.\n\nContinue?')">
+                                <i class="fas fa-redo"></i> Regenerate All Seating
+                            </a>
+                            {% else %}
+                            <a href="{% url 'generate_seating_by_examtype' 'final_term' %}"
+                               class="btn btn-success btn-lg"
+                               onclick="return confirm('GENERATE FINAL TERM SEAT PLANS\n\nGenerate for all Final Term schedules?')">
+                                <i class="fas fa-cogs"></i> Generate Seat Plans
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% for schedule in final_term_schedules %}
+                <div class="card mb-3">
+                    <div class="card-header {% if schedule.branch == 'BScCSIT' %}bg-primary{% else %}bg-success{% endif %} text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="fas fa-calendar-alt"></i> {{ schedule.name }}
+                                </h6>
+                                <small>
+                                    <i class="fas fa-calendar"></i>
+                                    {{ schedule.start_date|date:"M d" }} – {{ schedule.end_date|date:"M d, Y" }}
+                                    &nbsp;|&nbsp;
+                                    <i class="fas fa-graduation-cap"></i>
+                                    {{ schedule.branch }} · Semester {{ schedule.semester }}
+                                </small>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center">
+                                <a href="{% url 'add_exam_to_schedule' schedule.id %}" class="btn btn-sm btn-light">
+                                    <i class="fas fa-plus"></i> Add Exams
+                                </a>
+                                <button class="btn btn-sm btn-danger"
+                                        onclick="if(confirm('Delete entire schedule and all its exams?')) window.location.href='{% url 'delete_schedule' schedule.id %}'">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        {% if schedule.exams.all %}
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Day</th>
+                                        <th>Subject</th>
+                                        <th>Code</th>
+                                        <th>Time</th>
+                                        <th>Seating</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for exam in schedule.exams.all %}
+                                    {% with sc=exam.seatingarrangement_set.count %}
+                                    <tr>
+                                        <td><strong>{{ exam.date|date:"M d, Y" }}</strong></td>
+                                        <td><small class="text-muted">{{ exam.date|date:"l" }}</small></td>
+                                        <td>{{ exam.subject.name }}</td>
+                                        <td>
+                                            <span class="badge {% if schedule.branch == 'BScCSIT' %}bg-info{% else %}bg-success{% endif %}">
+                                                {{ exam.subject.code }}
+                                            </span>
+                                        </td>
+                                        <td>{{ exam.start_time|time:"g:i A" }} – {{ exam.end_time|time:"g:i A" }}</td>
+                                        <td>
+                                            {% if sc > 0 %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check-circle"></i> {{ sc }} seated
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Pending</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                {% if sc > 0 %}
+                                                <a href="{% url 'view_seating' exam.id %}" class="btn btn-primary" title="View Seating">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{% url 'download_seating_pdf' exam.id %}" class="btn btn-warning" title="PDF">
+                                                    <i class="fas fa-file-pdf"></i>
+                                                </a>
+                                                {% endif %}
+                                                <a href="{% url 'delete_exam' exam.id %}" class="btn btn-danger"
+                                                   onclick="return confirm('Delete this exam?')" title="Delete">
+                                                    <i class="fas fa-trash"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endwith %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-2 bg-light border-top">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i>
+                                {{ schedule.exams.count }} exam(s) · Students keep the same seat for all exams in this schedule.
+                            </small>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning m-3 mb-0">
+                            No exams added yet.
+                            <a href="{% url 'add_exam_to_schedule' schedule.id %}" class="alert-link">Add exams now</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+
+            {% else %}
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-graduation-cap fa-4x text-muted mb-3"></i>
+                        <h4>No Final Term Schedules</h4>
+                        <p class="text-muted mb-4">Create a Final Term schedule to get started.</p>
+                        <a href="{% url 'create_exam_schedule' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus"></i> Create Schedule
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+    </div><!-- /tab-content -->
+</div>
 {% endblock %}

@@ -1,69 +1,302 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2><i class="fas fa-chair"></i> Seating Arrangement</h2>
-            <p class="text-muted mb-0">{{ exam.subject.name }} - {{ exam.date|date:"M d, Y" }}</p>
+<div class="container-fluid mt-4">
+    {% if user.is_staff %}
+        <!-- Admin View -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h4>Seating Arrangement</h4>
+                <small class="text-muted">{{ exam.subject.name }} - {{ exam.date|date:"M d, Y" }}</small>
+            </div>
+            <div>
+                <a href="{% url 'download_seating_pdf' exam.id %}" class="btn btn-sm btn-success">
+                    <i class="fas fa-download"></i> PDF
+                </a>
+                <a href="{% url 'manage_exams' %}" class="btn btn-sm btn-secondary">
+                    Back
+                </a>
+            </div>
         </div>
-        <div>
-            <a href="{% url 'download_seating_pdf' exam.id %}" class="btn btn-success">
-                <i class="fas fa-download"></i> Download PDF
-            </a>
-            <a href="{% url 'manage_exams' %}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Back
-            </a>
-        </div>
-    </div>
-    
-    {% if halls_data %}
-        {% for hall_name, seats in halls_data.items %}
-        <div class="seating-hall mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4><i class="fas fa-door-open text-primary"></i> {{ hall_name }}</h4>
-                {% for inv in invigilators %}
-                    {% if inv.hall.name == hall_name %}
-                    <span class="badge bg-info" style="font-size: 1rem;">
-                        <i class="fas fa-user-tie"></i> Invigilator: {{ inv.invigilator.name }}
-                    </span>
-                    {% endif %}
+        
+        {% if halls_data %}
+            <div class="row">
+                {% for hall_name, hall_info in halls_data.items %}
+                <div class="col-lg-6 col-xl-4 mb-4">
+                    <div class="hall-plan">
+                        <!-- Header -->
+                        <div class="hall-header">
+                            <div></div>
+                            <div class="hall-name">{{ hall_name }}</div>
+                            <div class="invig-name">
+                                {% for inv in invigilators %}
+                                    {% if inv.hall.name == hall_name %}{{ inv.invigilator.name }}{% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <!-- Seating Grid -->
+                        <div class="bench-grid">
+                            <!-- Left Column (Bench 1-6) -->
+                            <div class="bench-col">
+                                {% for bench_num in "123456" %}
+                                <div class="bench-row">
+                                    <!-- Left Seat -->
+                                    <div class="seat">
+                                        {% for bench_key, bench_seats in hall_info.benches.items %}
+                                            {% if bench_key|stringformat:"s" == bench_num %}
+                                                {% if bench_seats.0 %}
+                                                    <span class="{% if not bench_seats.0.student.is_eligible %}text-danger{% endif %}">
+                                                        {{ bench_seats.0.student.roll_number }}
+                                                        {% if not bench_seats.0.student.is_eligible %}
+                                                        <br><small class="ineligible-text">(Ineligible)</small>
+                                                        {% endif %}
+                                                    </span>
+                                                {% else %}
+                                                    —
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                    
+                                    <!-- Divider -->
+                                    <div class="divider">{{ bench_num }}</div>
+                                    
+                                    <!-- Right Seat -->
+                                    <div class="seat">
+                                        {% for bench_key, bench_seats in hall_info.benches.items %}
+                                            {% if bench_key|stringformat:"s" == bench_num %}
+                                                {% if bench_seats.1 %}
+                                                    <span class="{% if not bench_seats.1.student.is_eligible %}text-danger{% endif %}">
+                                                        {{ bench_seats.1.student.roll_number }}
+                                                        {% if not bench_seats.1.student.is_eligible %}
+                                                        <br><small class="ineligible-text">(Ineligible)</small>
+                                                        {% endif %}
+                                                    </span>
+                                                {% else %}
+                                                    —
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <!-- Right Column (Bench 7-12) -->
+                            <div class="bench-col">
+                                {% for i in "123456" %}
+                                {% with bench_num=forloop.counter|add:6 %}
+                                <div class="bench-row">
+                                    <!-- Left Seat -->
+                                    <div class="seat">
+                                        {% for bench_key, bench_seats in hall_info.benches.items %}
+                                            {% if bench_key == bench_num %}
+                                                {% if bench_seats.0 %}
+                                                    <span class="{% if not bench_seats.0.student.is_eligible %}text-danger{% endif %}">
+                                                        {{ bench_seats.0.student.roll_number }}
+                                                        {% if not bench_seats.0.student.is_eligible %}
+                                                        <br><small class="ineligible-text">(Ineligible)</small>
+                                                        {% endif %}
+                                                    </span>
+                                                {% else %}
+                                                    —
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                    
+                                    <!-- Divider -->
+                                    <div class="divider">{{ bench_num }}</div>
+                                    
+                                    <!-- Right Seat -->
+                                    <div class="seat">
+                                        {% for bench_key, bench_seats in hall_info.benches.items %}
+                                            {% if bench_key == bench_num %}
+                                                {% if bench_seats.1 %}
+                                                    <span class="{% if not bench_seats.1.student.is_eligible %}text-danger{% endif %}">
+                                                        {{ bench_seats.1.student.roll_number }}
+                                                        {% if not bench_seats.1.student.is_eligible %}
+                                                        <br><small class="ineligible-text">(Ineligible)</small>
+                                                        {% endif %}
+                                                    </span>
+                                                {% else %}
+                                                    —
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endwith %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <div class="hall-footer">
+                            Total: {{ hall_info.total_students }} students
+                        </div>
+                    </div>
+                </div>
                 {% endfor %}
             </div>
             
-            <div class="table-responsive">
-                <table class="table table-bordered table-hover">
-                    <thead class="table-primary">
-                        <tr>
-                            <th>Seat No.</th>
-                            <th>Roll Number</th>
-                            <th>Student Name</th>
-                            <th>Branch</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for seat in seats %}
-                        <tr>
-                            <td><strong>{{ seat.seat_number }}</strong></td>
-                            <td><span class="badge bg-secondary">{{ seat.student.roll_number }}</span></td>
-                            <td>{{ seat.student.user.get_full_name }}</td>
-                            <td>{{ seat.student.branch }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <!-- Invigilator Schedule -->
+            <div class="card mt-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-user-tie"></i> Invigilator Schedule</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Hall</th>
+                                <th>Invigilator</th>
+                                <th>Contact</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inv in invigilators %}
+                            <tr>
+                                <td><strong>{{ inv.hall.name }}</strong></td>
+                                <td>{{ inv.invigilator.name }}</td>
+                                <td>{{ inv.invigilator.email }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
             
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> Total students in this hall: <strong>{{ seats|length }}</strong>
+            <!-- Legend -->
+            <div class="alert alert-info mt-3">
+                <strong>Legend:</strong> 
+                <span class="text-dark">Black text = Eligible</span> | 
+                <span class="text-danger">Red text (Ineligible) = Not eligible to take exam</span>
             </div>
-        </div>
-        {% endfor %}
+        {% else %}
+            <div class="alert alert-warning">
+                No seating arrangement generated yet.
+            </div>
+        {% endif %}
     {% else %}
-        <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i> No seating arrangement generated yet. 
-            <a href="{% url 'generate_seating' exam.id %}" class="alert-link">Click here to generate</a>
+        <!-- Student View -->
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">Your Seat</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        {% if seating %}
+                        <h4>{{ exam.subject.name }}</h4>
+                        <hr>
+                        
+                        {% if not seating.student.is_eligible %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle"></i> <strong>WARNING: You are INELIGIBLE for this exam</strong>
+                            <br>
+                            {% if not seating.student.fees_paid %}
+                            <small>• Fees not paid</small><br>
+                            {% endif %}
+                            {% if seating.student.attendance < 75 %}
+                            <small>• Attendance below 75% ({{ seating.student.attendance }}%)</small>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <p><strong>Hall:</strong> {{ seating.hall.name }}</p>
+                        <p><strong>Bench:</strong> <span class="badge {% if seating.student.is_eligible %}bg-warning{% else %}bg-danger{% endif %} text-dark" style="font-size: 2rem;">{{ seating.seat_number }}</span></p>
+                        <p><strong>Date:</strong> {{ exam.date|date:"M d, Y" }}</p>
+                        <p><strong>Time:</strong> {{ exam.start_time|time:"g:i A" }}</p>
+                        {% else %}
+                        <p class="text-muted">Not generated yet.</p>
+                        {% endif %}
+                        <a href="{% url 'dashboard' %}" class="btn btn-secondary btn-sm mt-3">Back</a>
+                    </div>
+                </div>
+            </div>
         </div>
     {% endif %}
 </div>
+
+<style>
+.hall-plan {
+    border: 1px solid #000;
+    background: #fff;
+    padding: 10px;
+}
+
+.hall-header {
+    display: grid;
+    grid-template-columns: 1fr 2fr 1fr;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #000;
+    font-size: 0.85rem;
+}
+
+.hall-name {
+    text-align: center;
+    font-weight: bold;
+}
+
+.invig-name {
+    text-align: right;
+    font-size: 0.7rem;
+}
+
+.bench-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.bench-col {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bench-row {
+    display: grid;
+    grid-template-columns: 1fr 20px 1fr;
+    border: 1px solid #333;
+    min-height: 40px;
+}
+
+.seat {
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.ineligible-text {
+    font-size: 0.55rem;
+    font-weight: normal;
+}
+
+.divider {
+    background: #eee;
+    border-left: 1px solid #333;
+    border-right: 1px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-weight: bold;
+    color: #999;
+}
+
+.hall-footer {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #ddd;
+    font-size: 0.7rem;
+    text-align: center;
+}
+</style>
 {% endblock %}

@@ -3,20 +3,50 @@
 {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
-        <div class="col-md-6">
+        <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
                     <i class="fas fa-chart-bar"></i> Add Result
                 </div>
                 <div class="card-body">
+                    <!-- Filter Students -->
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Use the filters below to find the student
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Filter by Branch</label>
+                            <select id="branchFilter" class="form-select">
+                                <option value="">All Branches</option>
+                                <option value="BScCSIT">BScCSIT</option>
+                                <option value="BCA">BCA</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Filter by Semester</label>
+                            <select id="semesterFilter" class="form-select">
+                                <option value="">All Semesters</option>
+                                {% for i in "12345678" %}
+                                <option value="{{ i }}">Semester {{ i }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
                     <form method="POST">
                         {% csrf_token %}
+                        
                         <div class="mb-3">
                             <label class="form-label">Student</label>
-                            <select name="student" class="form-select" required>
+                            <select name="student" id="studentSelect" class="form-select" required>
                                 <option value="">Select Student</option>
                                 {% for student in students %}
-                                <option value="{{ student.id }}">{{ student.roll_number }} - {{ student.user.get_full_name }}</option>
+                                <option value="{{ student.id }}" 
+                                        data-branch="{{ student.branch }}" 
+                                        data-semester="{{ student.semester }}">
+                                    {{ student.roll_number }} - {{ student.user.get_full_name }} ({{ student.branch }} Sem {{ student.semester }})
+                                </option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -64,4 +94,37 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const branchFilter = document.getElementById('branchFilter');
+    const semesterFilter = document.getElementById('semesterFilter');
+    const studentSelect = document.getElementById('studentSelect');
+    const allOptions = Array.from(studentSelect.options).slice(1); // Exclude first "Select Student"
+    
+    function filterStudents() {
+        const selectedBranch = branchFilter.value;
+        const selectedSemester = semesterFilter.value;
+        
+        // Remove all options except first
+        studentSelect.innerHTML = '<option value="">Select Student</option>';
+        
+        // Add filtered options
+        allOptions.forEach(option => {
+            const branch = option.getAttribute('data-branch');
+            const semester = option.getAttribute('data-semester');
+            
+            const matchBranch = !selectedBranch || branch === selectedBranch;
+            const matchSemester = !selectedSemester || semester === selectedSemester;
+            
+            if (matchBranch && matchSemester) {
+                studentSelect.appendChild(option.cloneNode(true));
+            }
+        });
+    }
+    
+    branchFilter.addEventListener('change', filterStudents);
+    semesterFilter.addEventListener('change', filterStudents);
+});
+</script>
 {% endblock %}

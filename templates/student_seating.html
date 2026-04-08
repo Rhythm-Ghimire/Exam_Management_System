@@ -1,53 +1,209 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <i class="fas fa-chair"></i> Your Seating Arrangement
-                </div>
-                <div class="card-body">
-                    <h4 class="text-primary mb-4">{{ exam.subject.name }}</h4>
-                    
-                    {% if seating %}
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <p><strong>Date:</strong> {{ exam.date|date:"M d, Y" }}</p>
-                            <p><strong>Time:</strong> {{ exam.start_time|time:"g:i A" }} - {{ exam.end_time|time:"g:i A" }}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <p><strong>Exam Hall:</strong> {{ seating.hall.name }}</p>
-                            <p><strong>Seat Number:</strong> <span class="badge bg-primary" style="font-size: 1.2rem;">{{ seating.seat_number }}</span></p>
-                        </div>
-                    </div>
-                    
-                    <div class="alert alert-success">
-                        <i class="fas fa-check-circle"></i> Please arrive 15 minutes before the exam starts. Bring your student ID card.
-                    </div>
-                    
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> <strong>Instructions:</strong>
-                        <ul class="mb-0 mt-2">
-                            <li>Mobile phones and electronic devices are not allowed</li>
-                            <li>Arrive at least 15 minutes before exam time</li>
-                            <li>Bring valid student ID card</li>
-                            <li>No calculator unless specified by the subject</li>
-                        </ul>
-                    </div>
-                    {% else %}
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle"></i> Seating arrangement not yet generated for this exam.
-                    </div>
-                    {% endif %}
-                    
-                    <a href="{% url 'dashboard' %}" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Dashboard
-                    </a>
-                </div>
-            </div>
+<div class="container-fluid mt-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4>Seating Arrangement</h4>
+            <small class="text-muted">{{ exam.subject.name }} — {{ exam.date|date:"M d, Y" }}
+            &nbsp;|&nbsp; {{ exam.start_time|time:"g:i A" }} – {{ exam.end_time|time:"g:i A" }}</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'download_seating_pdf' exam.id %}" class="btn btn-sm btn-success">
+                <i class="fas fa-download"></i> PDF
+            </a>
+            <a href="{% url 'dashboard' %}" class="btn btn-sm btn-secondary">Back</a>
         </div>
     </div>
+
+    <!-- My seat banner -->
+    {% if my_seating %}
+    <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+        <i class="fas fa-map-marker-alt fa-lg"></i>
+        <div>
+            <strong>Your seat:</strong>
+            Hall <strong>{{ my_seating.hall.name }}</strong>,
+            Bench <strong>{{ my_seating.seat_number }}</strong>
+            &nbsp;<span class="badge bg-warning text-dark">Highlighted in yellow below</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if halls_data %}
+    <div class="row">
+        {% for hall_name, hall_info in halls_data.items %}
+        <div class="col-lg-6 col-xl-4 mb-4">
+            <div class="hall-plan">
+
+                <!-- Hall header -->
+                <div class="hall-header">
+                    <div></div>
+                    <div class="hall-name">{{ hall_name }}</div>
+                    <div class="invig-name">
+                        {% for inv in invigilators %}
+                            {% if inv.hall.name == hall_name %}{{ inv.invigilator.name }}{% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Seating Grid -->
+                <div class="bench-grid">
+
+                    <!-- Left Column (Bench 1-6) -->
+                    <div class="bench-col">
+                        {% for bench_num in "123456" %}
+                        <div class="bench-row">
+                            <!-- Left Seat -->
+                            <div class="seat{% for bench_key, bench_seats in hall_info.benches.items %}{% if bench_key|stringformat:"s" == bench_num %}{% if bench_seats.0 %}{% if bench_seats.0.student.roll_number == my_roll %} my-seat{% endif %}{% endif %}{% endif %}{% endfor %}">
+                                {% for bench_key, bench_seats in hall_info.benches.items %}
+                                    {% if bench_key|stringformat:"s" == bench_num %}
+                                        {% if bench_seats.0 %}
+                                            <span class="{% if not bench_seats.0.student.is_eligible %}text-danger{% endif %}">
+                                                {{ bench_seats.0.student.roll_number }}
+                                                {% if bench_seats.0.student.roll_number == my_roll %}<br><small class="you-text">(You)</small>{% endif %}
+                                                {% if not bench_seats.0.student.is_eligible %}<br><small class="ineligible-text">(Ineligible)</small>{% endif %}
+                                            </span>
+                                        {% else %}—{% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+
+                            <!-- Divider -->
+                            <div class="divider">{{ bench_num }}</div>
+
+                            <!-- Right Seat -->
+                            <div class="seat{% for bench_key, bench_seats in hall_info.benches.items %}{% if bench_key|stringformat:"s" == bench_num %}{% if bench_seats.1 %}{% if bench_seats.1.student.roll_number == my_roll %} my-seat{% endif %}{% endif %}{% endif %}{% endfor %}">
+                                {% for bench_key, bench_seats in hall_info.benches.items %}
+                                    {% if bench_key|stringformat:"s" == bench_num %}
+                                        {% if bench_seats.1 %}
+                                            <span class="{% if not bench_seats.1.student.is_eligible %}text-danger{% endif %}">
+                                                {{ bench_seats.1.student.roll_number }}
+                                                {% if bench_seats.1.student.roll_number == my_roll %}<br><small class="you-text">(You)</small>{% endif %}
+                                                {% if not bench_seats.1.student.is_eligible %}<br><small class="ineligible-text">(Ineligible)</small>{% endif %}
+                                            </span>
+                                        {% else %}—{% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Right Column (Bench 7-12) -->
+                    <div class="bench-col">
+                        {% for i in "123456" %}
+                        {% with bench_num=forloop.counter|add:6 %}
+                        <div class="bench-row">
+                            <!-- Left Seat -->
+                            <div class="seat{% for bench_key, bench_seats in hall_info.benches.items %}{% if bench_key == bench_num %}{% if bench_seats.0 %}{% if bench_seats.0.student.roll_number == my_roll %} my-seat{% endif %}{% endif %}{% endif %}{% endfor %}">
+                                {% for bench_key, bench_seats in hall_info.benches.items %}
+                                    {% if bench_key == bench_num %}
+                                        {% if bench_seats.0 %}
+                                            <span class="{% if not bench_seats.0.student.is_eligible %}text-danger{% endif %}">
+                                                {{ bench_seats.0.student.roll_number }}
+                                                {% if bench_seats.0.student.roll_number == my_roll %}<br><small class="you-text">(You)</small>{% endif %}
+                                                {% if not bench_seats.0.student.is_eligible %}<br><small class="ineligible-text">(Ineligible)</small>{% endif %}
+                                            </span>
+                                        {% else %}—{% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+
+                            <!-- Divider -->
+                            <div class="divider">{{ bench_num }}</div>
+
+                            <!-- Right Seat -->
+                            <div class="seat{% for bench_key, bench_seats in hall_info.benches.items %}{% if bench_key == bench_num %}{% if bench_seats.1 %}{% if bench_seats.1.student.roll_number == my_roll %} my-seat{% endif %}{% endif %}{% endif %}{% endfor %}">
+                                {% for bench_key, bench_seats in hall_info.benches.items %}
+                                    {% if bench_key == bench_num %}
+                                        {% if bench_seats.1 %}
+                                            <span class="{% if not bench_seats.1.student.is_eligible %}text-danger{% endif %}">
+                                                {{ bench_seats.1.student.roll_number }}
+                                                {% if bench_seats.1.student.roll_number == my_roll %}<br><small class="you-text">(You)</small>{% endif %}
+                                                {% if not bench_seats.1.student.is_eligible %}<br><small class="ineligible-text">(Ineligible)</small>{% endif %}
+                                            </span>
+                                        {% else %}—{% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endwith %}
+                        {% endfor %}
+                    </div>
+
+                </div><!-- /bench-grid -->
+
+                <div class="hall-footer">Total: {{ hall_info.total_students }} students</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Invigilator Schedule -->
+    <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="fas fa-user-tie"></i> Invigilator Schedule</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-bordered mb-0">
+                <thead class="table-light">
+                    <tr><th>Hall</th><th>Invigilator</th><th>Contact</th></tr>
+                </thead>
+                <tbody>
+                    {% for inv in invigilators %}
+                    <tr>
+                        <td><strong>{{ inv.hall.name }}</strong></td>
+                        <td>{{ inv.invigilator.name }}</td>
+                        <td>{{ inv.invigilator.email }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="alert alert-light mt-3">
+        <strong>Legend:</strong>
+        Black = Eligible &nbsp;|&nbsp;
+        <span class="text-danger">Red = Ineligible</span> &nbsp;|&nbsp;
+        <span style="background:#fff9c4; padding:1px 6px; border-radius:3px;">Yellow = Your seat</span>
+    </div>
+
+    {% else %}
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle"></i> Seating arrangement not generated yet.
+    </div>
+    {% endif %}
+
 </div>
+
+<style>
+.hall-plan { border: 1px solid #000; background: #fff; padding: 10px; }
+.hall-header {
+    display: grid; grid-template-columns: 1fr 2fr 1fr;
+    margin-bottom: 10px; padding-bottom: 8px;
+    border-bottom: 1px solid #000; font-size: 0.85rem;
+}
+.hall-name { text-align: center; font-weight: bold; }
+.invig-name { text-align: right; font-size: 0.7rem; }
+.bench-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.bench-col { display: flex; flex-direction: column; gap: 6px; }
+.bench-row { display: grid; grid-template-columns: 1fr 20px 1fr; border: 1px solid #333; min-height: 40px; }
+.seat {
+    padding: 5px; display: flex; align-items: center;
+    justify-content: center; font-size: 0.75rem; font-weight: 600; text-align: center;
+}
+.my-seat { background-color: #fff9c4; }
+.divider {
+    background: #eee; border-left: 1px solid #333; border-right: 1px solid #333;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.6rem; font-weight: bold; color: #999;
+}
+.hall-footer { margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd; font-size: 0.7rem; text-align: center; }
+.ineligible-text { font-size: 0.55rem; font-weight: normal; }
+.you-text { font-size: 0.6rem; font-weight: bold; color: #198754; }
+</style>
 {% endblock %}

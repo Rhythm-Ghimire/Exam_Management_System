@@ -20,3 +20,11 @@
 
 # # Run server
 # python manage.py runserver
+
+
+
+
+Todo:
+- Results ma ni sab ko aauna milne wala banaune(nadiyeko lai absent mark garne)
+-Seating generate garda make it so that paila euta date range banaune ani tesma exam add garne, and seat is generated accordingly
+

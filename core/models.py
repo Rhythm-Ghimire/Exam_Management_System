@@ -44,6 +44,11 @@ class ExamHall(models.Model):
     
     def __str__(self):
         return f"{self.name} (Capacity: {self.capacity})"
+    
+    @property
+    def benches(self):
+        """Calculate number of benches (2 students per bench)"""
+        return self.capacity // 2
 
 
 class Invigilator(models.Model):
@@ -132,7 +137,7 @@ class InvigilatorAssignment(models.Model):
 class Result(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
-    exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
+    exam = models.ForeignKey(Exam, on_delete=models.SET_NULL, null=True, blank=True)  # Changed to SET_NULL
     marks_obtained = models.FloatField()
     max_marks = models.FloatField(default=100)
     grade = models.CharField(max_length=5, blank=True)

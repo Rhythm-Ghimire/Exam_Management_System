@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
 
 {% block content %}
 <div class="container mt-4">
@@ -37,57 +36,143 @@
         </div>
     </div>
     
+    <!-- Filter Section -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="fas fa-filter"></i> Filter Students</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{% url 'students_overview' %}" class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label">Branch</label>
+                    <select name="branch" class="form-select" onchange="this.form.submit()">
+                        {% for value, label in branches %}
+                        <option value="{{ value }}" {% if selected_branch == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Semester</label>
+                    <select name="semester" class="form-select" onchange="this.form.submit()">
+                        {% for value, label in semesters %}
+                        <option value="{{ value }}" {% if selected_semester == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <a href="{% url 'students_overview' %}" class="btn btn-secondary w-100">
+                        <i class="fas fa-redo"></i> Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     {% for branch, semesters in grouped_students.items %}
     <div class="card mb-4">
-        <div class="card-header">
+        <div class="card-header {% if branch == 'BScCSIT' %}bg-primary{% else %}bg-success{% endif %} text-white">
             <h4 class="mb-0"><i class="fas fa-graduation-cap"></i> {{ branch }}</h4>
         </div>
         <div class="card-body">
-            {% for semester, students in semesters.items %}
+            {% for semester, students_list in semesters.items %}
             <div class="mb-4">
-                <h5 class="text-primary mb-3">
-                    <i class="fas fa-book-open"></i> Semester {{ semesters }}
-                    <span class="badge bg-secondary">{{ students|length }} Students</span>
-                </h5>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="text-primary mb-0">
+                        <i class="fas fa-book-open"></i> Semester {{ semester }}
+                        <span class="badge bg-secondary">{{ students_list|length }} Student{% if students_list|length != 1 %}s{% endif %}</span>
+                    </h5>
+                </div>
                 
+                <!-- Subjects for this semester -->
+                <div class="alert alert-light mb-3">
+                    <h6 class="mb-2">
+                        <i class="fas fa-book text-info"></i> <strong>Subjects:</strong>
+                    </h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for subject in subjects_by_semester.items %}
+                            {% if subject.0 == semester %}
+                                {% for subj in subject.1 %}
+                                    {% if subj.branch == branch %}
+                                    <span class="badge bg-info">{{ subj.code }} - {{ subj.name }}</span>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        {% empty %}
+                            <span class="text-muted">No subjects found</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- Exams for this semester -->
+                <div class="alert alert-warning mb-3">
+                    <h6 class="mb-2">
+                        <i class="fas fa-clipboard-list"></i> <strong>Scheduled Exams:</strong>
+                    </h6>
+                    <div class="row g-2">
+                        {% for exam_sem, exams in exams_by_semester.items %}
+                            {% if exam_sem == semester %}
+                                {% for exam in exams %}
+                                    {% if exam.schedule.branch == branch %}
+                                    <div class="col-md-6">
+                                        <div class="d-flex justify-content-between align-items-center small">
+                                            <span>
+                                                <strong>{{ exam.subject.code }}</strong> - {{ exam.date|date:"M d" }} at {{ exam.start_time|time:"g:i A" }}
+                                            </span>
+                                            <span class="badge {% if exam.schedule.exam_type == 'mid_term' %}bg-warning text-dark{% else %}bg-success{% endif %} ms-2">
+                                                {{ exam.schedule.get_exam_type_display }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- Students List -->
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover">
+                    <table class="table table-sm table-hover table-bordered">
                         <thead class="table-light">
                             <tr>
-                                <th>Roll No.</th>
-                                <th>Name</th>
-                                <th>Attendance</th>
-                                <th>Fees</th>
-                                <th>Eligible</th>
-                                <th>Actions</th>
+                                <th width="15%">Roll No.</th>
+                                <th width="25%">Name</th>
+                                <th width="15%">Attendance</th>
+                                <th width="15%">Fees</th>
+                                <th width="15%">Eligible</th>
+                                <th width="15%">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for student in students %}
+                            {% for student in students_list %}
                             <tr>
                                 <td><strong>{{ student.roll_number }}</strong></td>
                                 <td>{{ student.user.get_full_name }}</td>
-                                <td>
+                                <td class="text-center">
                                     <span class="badge {% if student.attendance >= 75 %}bg-success{% else %}bg-danger{% endif %}">
                                         {{ student.attendance }}%
                                     </span>
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     {% if student.fees_paid %}
-                                        <span class="badge bg-success">Paid</span>
+                                        <span class="badge bg-success"><i class="fas fa-check"></i> Paid</span>
                                     {% else %}
-                                        <span class="badge bg-danger">Unpaid</span>
+                                        <span class="badge bg-danger"><i class="fas fa-times"></i> Unpaid</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     {% if student.is_eligible %}
-                                        <span class="badge bg-success">Yes</span>
+                                        <span class="badge bg-success"><i class="fas fa-check-circle"></i> Yes</span>
                                     {% else %}
-                                        <span class="badge bg-danger">No</span>
+                                        <span class="badge bg-danger"><i class="fas fa-times-circle"></i> No</span>
                                     {% endif %}
                                 </td>
-                                <td>
-                                    <a href="{% url 'edit_student' student.id %}" class="btn btn-sm btn-warning">
+                                <td class="text-center">
+                                    <a href="{% url 'edit_student' student.id %}" class="btn btn-sm btn-warning" title="Edit Student">
                                         <i class="fas fa-edit"></i>
                                     </a>
                                 </td>
@@ -97,13 +182,13 @@
                     </table>
                 </div>
             </div>
-            <hr>
+            {% if not forloop.last %}<hr class="my-4">{% endif %}
             {% endfor %}
         </div>
     </div>
     {% empty %}
     <div class="alert alert-info">
-        <i class="fas fa-info-circle"></i> No students found. Add students to get started.
+        <i class="fas fa-info-circle"></i> No students found with the selected filters.
     </div>
     {% endfor %}
 </div>

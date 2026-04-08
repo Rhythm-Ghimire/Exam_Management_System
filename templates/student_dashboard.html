@@ -3,11 +3,12 @@
 {% block content %}
 <div class="container mt-4">
     <h2 class="mb-4">Student Dashboard</h2>
-    
+
+    <!-- Student Info -->
     <div class="row mb-4">
         <div class="col-md-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header bg-primary text-white">
                     <i class="fas fa-user"></i> Student Information
                 </div>
                 <div class="card-body">
@@ -21,11 +22,15 @@
                             <p><strong>Semester:</strong> {{ student.semester }}</p>
                             <p><strong>Attendance:</strong> {{ student.attendance }}%</p>
                             <p>
-                                <strong>Exam Eligibility:</strong> 
+                                <strong>Exam Eligibility:</strong>
                                 {% if student.is_eligible %}
                                     <span class="badge bg-success">Eligible</span>
                                 {% else %}
                                     <span class="badge bg-danger">Not Eligible</span>
+                                    <br><small class="text-danger">
+                                        {% if not student.fees_paid %}Fees not paid{% endif %}
+                                        {% if student.attendance < 75 %}{% if not student.fees_paid %} | {% endif %}Attendance below 75%{% endif %}
+                                    </small>
                                 {% endif %}
                             </p>
                         </div>
@@ -34,64 +39,188 @@
             </div>
         </div>
     </div>
-    
+
     <div class="row">
+        <!-- Seating Card -->
         <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <i class="fas fa-calendar-alt"></i> Upcoming Exams
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-chair"></i> My Seating Arrangement
                 </div>
                 <div class="card-body">
-                    {% if upcoming_exams %}
-                        <div class="list-group">
-                            {% for exam in upcoming_exams %}
-                            <div class="list-group-item">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">{{ exam.subject.name }}</h6>
-                                    <small>{{ exam.date|date:"M d, Y" }}</small>
-                                </div>
-                                <p class="mb-1">
-                                    <span class="badge bg-info">{{ exam.subject.code }}</span>
-                                    {% if exam.schedule %}
-                                        <span class="badge {% if exam.schedule.exam_type == 'mid_term' %}bg-warning text-dark{% else %}bg-success{% endif %}">
-                                            {{ exam.schedule.get_exam_type_display }}
-                                        </span>
-                                    {% endif %}
-                                </p>
-                                <small>{{ exam.start_time|time:"g:i A" }} - {{ exam.end_time|time:"g:i A" }}</small>
-                            </div>
-                            {% endfor %}
+                    {% if seating_arrangements %}
+                        {% with first_seat=seating_arrangements.first %}
+                        <div class="alert alert-info py-2 mb-3">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Note:</strong> You have the same seat for all exams in this schedule.
                         </div>
+                        <table class="table table-sm table-bordered mb-3">
+                            <tbody>
+                                <tr>
+                                    <th class="bg-light" style="width:40%">Hall</th>
+                                    <td><strong>{{ first_seat.hall.name }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">Bench No.</th>
+                                    <td><strong>{{ first_seat.seat_number }}</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'view_seating' first_seat.exam.id %}" class="btn btn-primary">
+                                <i class="fas fa-eye"></i> View Full Hall Layout
+                            </a>
+                            <a href="{% url 'download_seating_pdf' first_seat.exam.id %}" class="btn btn-success">
+                                <i class="fas fa-download"></i> Download Seating Plan (PDF)
+                            </a>
+                        </div>
+                        {% endwith %}
                     {% else %}
-                        <p class="text-muted">No upcoming exams</p>
+                        <div class="alert alert-warning mb-0">
+                            <i class="fas fa-exclamation-circle"></i> Seating arrangement not generated yet.
+                        </div>
                     {% endif %}
                 </div>
             </div>
         </div>
-        
+
+        <!-- Exam Schedule Card -->
         <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <i class="fas fa-chair"></i> My Seating Arrangements
+            <div class="card h-100">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-calendar-alt"></i> My Exam Schedule</span>
+                    {% if active_schedule %}
+                    <a href="{% url 'download_student_timetable' student.id %}" class="btn btn-sm btn-light">
+                        <i class="fas fa-download"></i> PDF
+                    </a>
+                    {% endif %}
                 </div>
                 <div class="card-body">
-                    {% if seating_arrangements %}
+                    {% if active_schedule %}
+                        <div class="mb-3">
+                            <h6 class="text-primary">{{ active_schedule.name }}</h6>
+                            <small class="text-muted">
+                                {{ active_schedule.start_date|date:"M d" }} – {{ active_schedule.end_date|date:"M d, Y" }}
+                            </small>
+                        </div>
+                        {% if upcoming_exams %}
                         <div class="list-group">
-                            {% for seat in seating_arrangements %}
-                            <a href="{% url 'view_seating' seat.exam.id %}" class="list-group-item list-group-item-action">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">{{ seat.exam.subject.name }}</h6>
-                                    <small>{{ seat.exam.date|date:"M d, Y" }}</small>
+                            {% for exam in upcoming_exams %}
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">{{ exam.subject.name }}</h6>
+                                        <p class="mb-1">
+                                            <span class="badge bg-info">{{ exam.subject.code }}</span>
+                                            <span class="badge bg-primary">{{ exam.start_time|time:"g:i A" }}</span>
+                                        </p>
+                                    </div>
+                                    <div class="text-end">
+                                        <strong>{{ exam.date|date:"M d" }}</strong><br>
+                                        <small class="text-muted">{{ exam.date|date:"D" }}</small>
+                                    </div>
                                 </div>
-                                <p class="mb-1">
-                                    <strong>Hall:</strong> {{ seat.hall.name }} | 
-                                    <strong>Seat:</strong> <span class="badge bg-primary">{{ seat.seat_number }}</span>
-                                </p>
-                            </a>
+                            </div>
                             {% endfor %}
                         </div>
+                        {% else %}
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-check-circle"></i> No upcoming exams remaining.
+                        </div>
+                        {% endif %}
                     {% else %}
-                        <p class="text-muted">No seating arrangements yet</p>
+                        <div class="alert alert-warning mb-0">
+                            <i class="fas fa-info-circle"></i> No active exam schedule at the moment.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <i class="fas fa-chart-line"></i> My Results
+                </div>
+                <div class="card-body">
+                    {% if results_by_schedule %}
+                        {% for schedule_data in results_by_schedule %}
+                        <div class="mb-4">
+                            <h5 class="text-primary">
+                                <i class="fas fa-book"></i> {{ schedule_data.schedule.name }}
+                            </h5>
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <div class="card border-primary">
+                                        <div class="card-body text-center p-2">
+                                            <h4 class="mb-0 text-primary">{{ schedule_data.percentage }}%</h4>
+                                            <small>Overall</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card border-success">
+                                        <div class="card-body text-center p-2">
+                                            <h4 class="mb-0 text-success">{{ schedule_data.passed }}</h4>
+                                            <small>Passed</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card border-danger">
+                                        <div class="card-body text-center p-2">
+                                            <h4 class="mb-0 text-danger">{{ schedule_data.failed }}</h4>
+                                            <small>Failed</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card border-info">
+                                        <div class="card-body text-center p-2">
+                                            <h4 class="mb-0 text-info">{{ schedule_data.results|length }}</h4>
+                                            <small>Subjects</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Subject</th>
+                                            <th>Code</th>
+                                            <th>Marks</th>
+                                            <th>Grade</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for result in schedule_data.results %}
+                                        <tr>
+                                            <td>{{ result.subject.name }}</td>
+                                            <td><span class="badge bg-secondary">{{ result.subject.code }}</span></td>
+                                            <td>{{ result.marks_obtained }} / {{ result.max_marks }}</td>
+                                            <td><span class="badge bg-primary">{{ result.grade }}</span></td>
+                                            <td>
+                                                {% if result.marks_obtained >= 40 %}
+                                                    <span class="badge bg-success">Pass</span>
+                                                {% else %}
+                                                    <span class="badge bg-danger">Fail</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% if not forloop.last %}<hr>{% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted mb-0">No results available yet.</p>
                     {% endif %}
                 </div>
             </div>
